@@ -4,7 +4,7 @@ import { NextResponse } from "next/server";
 import { ensureUsersSchema, type UserRow } from "../db/users";
 import { requireTursoClient } from "./turso";
 
-export const SESSION_COOKIE = "mc_session";
+export const SESSION_COOKIE = "mr_session";
 const SESSION_DAYS = 30;
 
 export function hashPassword(password: string): string {

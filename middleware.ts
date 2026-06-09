@@ -17,7 +17,7 @@ export function middleware(req: NextRequest) {
   );
   if (!isProtected) return NextResponse.next();
 
-  const session = req.cookies.get("mc_session")?.value;
+  const session = req.cookies.get("mr_session")?.value;
   if (!session) {
     const login = new URL("/login", req.url);
     login.searchParams.set("next", pathname);
