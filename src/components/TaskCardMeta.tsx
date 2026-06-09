@@ -1,0 +1,112 @@
+"use client";
+
+import { useState } from "react";
+import PillarChip from "./PillarChip";
+import TaskMilestoneSelect from "./TaskMilestoneSelect";
+import TaskPillarSelect from "./TaskPillarSelect";
+import TaskScheduleSelect, {
+  scheduleModeFromType,
+  scheduleTypeFromMode,
+  type TaskScheduleMode,
+} from "./TaskScheduleSelect";
+
+type Pillar = {
+  id: number;
+  name: string;
+  abbreviation?: string | null;
+  color?: string | null;
+};
+
+type Milestone = {
+  id: number;
+  title: string;
+  pillar_id: number | null;
+  completed_at?: string | null;
+};
+
+export default function TaskCardMeta({
+  pillars,
+  milestones,
+  pillarId,
+  milestoneId,
+  scheduleType,
+  compact = false,
+  onPillarChange,
+  onMilestoneChange,
+  onScheduleChange,
+}: {
+  pillars: Pillar[];
+  milestones: Milestone[];
+  pillarId: number | null;
+  milestoneId: number | null;
+  scheduleType?: string | null;
+  compact?: boolean;
+  onPillarChange: (pillarId: number | null) => void;
+  onMilestoneChange: (milestoneId: number | null) => void;
+  onScheduleChange: (mode: TaskScheduleMode) => void;
+}) {
+  const [editing, setEditing] = useState(false);
+  const mode = scheduleModeFromType(scheduleType);
+
+  const pillar = pillarId ? pillars.find((p) => p.id === pillarId) : null;
+  const milestone = milestoneId ? milestones.find((m) => m.id === milestoneId) : null;
+
+  if (editing) {
+    return (
+      <div className={`taskCardMeta taskCardMetaEditing ${compact ? "taskCardMetaCompact" : ""}`}>
+        <TaskPillarSelect
+          pillars={pillars}
+          value={pillarId}
+          onChange={onPillarChange}
+          compact={compact}
+        />
+        <TaskMilestoneSelect
+          milestones={milestones}
+          pillarId={pillarId}
+          value={milestoneId}
+          onChange={onMilestoneChange}
+          compact={compact}
+        />
+        <TaskScheduleSelect value={mode} onChange={onScheduleChange} compact={compact} />
+        <button
+          type="button"
+          className="outlineButton btnCompact"
+          onClick={() => setEditing(false)}
+        >
+          Done
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <div className={`taskCardMeta ${compact ? "taskCardMetaCompact" : ""}`}>
+      {pillar ? (
+        <PillarChip
+          name={pillar.name}
+          abbreviation={pillar.abbreviation}
+          color={pillar.color}
+          compact
+        />
+      ) : null}
+      {milestone ? (
+        <span className="pill pillSubtle taskMilestonePill" title={milestone.title}>
+          {compact && milestone.title.length > 20
+            ? `${milestone.title.slice(0, 18)}…`
+            : milestone.title}
+        </span>
+      ) : null}
+      <button
+        type="button"
+        className="outlineButton btnCompact taskCardEditBtn"
+        onClick={() => setEditing(true)}
+        aria-label="Edit pillar, milestone, and schedule"
+        title="Edit pillar, milestone, and schedule"
+      >
+        Edit
+      </button>
+    </div>
+  );
+}
+
+export { scheduleTypeFromMode, scheduleModeFromType };
