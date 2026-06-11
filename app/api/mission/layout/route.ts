@@ -1,9 +1,11 @@
 import { NextResponse } from "next/server";
-import { ensureLifeSchema } from "../../../../src/db/life";
 import { requireSessionUser } from "../../../../src/lib/auth";
 import { isYyyyMmDd, todayIsoYyyyMmDd } from "../../../../src/lib/date";
 import { boardToLayout, type BoardItem } from "../../../../src/lib/mission-layout";
-import { requireTursoClient } from "../../../../src/lib/turso";
+import {
+  getMissionLayout,
+  upsertMissionLayout,
+} from "../../../../src/lib/mongodb/store/daily-logs";
 
 export async function POST(req: Request) {
   try {
@@ -12,27 +14,29 @@ export async function POST(req: Request) {
       today?: BoardItem[];
       coming_up?: BoardItem[];
       layout_date?: string;
+      today_user_ordered?: boolean;
     };
 
     if (!Array.isArray(body.today) || !Array.isArray(body.coming_up)) {
       return NextResponse.json({ ok: false, error: "Invalid layout" }, { status: 400 });
     }
 
-    const turso = requireTursoClient();
-    await ensureLifeSchema(turso);
     const layoutDate =
       body.layout_date && isYyyyMmDd(body.layout_date)
         ? body.layout_date
         : todayIsoYyyyMmDd();
-    const layout = JSON.stringify(boardToLayout(body.today, body.coming_up));
 
-    await turso.execute({
-      sql: `INSERT INTO daily_logs (user_id, log_date, mission_layout, updated_at)
-            VALUES (?, ?, ?, datetime('now'))
-            ON CONFLICT(user_id, log_date) DO UPDATE SET
-              mission_layout = excluded.mission_layout,
-              updated_at = datetime('now');`,
-      args: [user.id, layoutDate, layout],
+    const existing = await getMissionLayout(user.id, layoutDate);
+    const todayUserOrdered =
+      body.today_user_ordered === true
+        ? true
+        : (existing?.today_user_ordered ?? false);
+
+    await upsertMissionLayout(user.id, layoutDate, {
+      ...boardToLayout(body.today, body.coming_up),
+      later: existing?.later,
+      reflection: existing?.reflection,
+      today_user_ordered: todayUserOrdered,
     });
 
     return NextResponse.json({ ok: true });

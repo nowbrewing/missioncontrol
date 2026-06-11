@@ -1,9 +1,11 @@
 import { NextResponse } from "next/server";
-import { ensureLifeSchema } from "../../../../src/db/life";
 import { requireSessionUser } from "../../../../src/lib/auth";
 import { normalizePillarAbbreviationInput } from "../../../../src/lib/pillar-abbreviation";
 import { isValidPillarColor, normalizePillarColor } from "../../../../src/lib/pillar-colors";
-import { requireTursoClient } from "../../../../src/lib/turso";
+import {
+  deletePillar,
+  updatePillar,
+} from "../../../../src/lib/mongodb/store/users";
 
 type Params = { params: Promise<{ id: string }> };
 
@@ -22,47 +24,39 @@ export const PATCH = async (req: Request, { params }: Params) => {
       abbreviation?: string | null;
       color?: string;
     };
-    const turso = requireTursoClient();
-    await ensureLifeSchema(turso);
-
     if (body.color !== undefined && !isValidPillarColor(body.color)) {
       return NextResponse.json({ ok: false, error: "Invalid color" }, { status: 400 });
     }
 
-    const sets: string[] = [];
-    const args: (string | number | null)[] = [];
+    const patch: Partial<{
+      name: string;
+      description: string | null;
+      color: string;
+      abbreviation: string | null;
+    }> = {};
 
     if (body.name !== undefined) {
       const name = body.name.trim();
       if (!name) {
         return NextResponse.json({ ok: false, error: "Name is required" }, { status: 400 });
       }
-      sets.push("name = ?");
-      args.push(name);
+      patch.name = name;
     }
     if (body.description !== undefined) {
-      sets.push("description = ?");
-      args.push(
-        typeof body.description === "string" ? body.description.trim() || null : null
-      );
+      patch.description =
+        typeof body.description === "string" ? body.description.trim() || null : null;
     }
     if (body.color !== undefined) {
-      sets.push("color = ?");
-      args.push(normalizePillarColor(body.color));
+      patch.color = normalizePillarColor(body.color);
     }
     if (body.abbreviation !== undefined) {
-      sets.push("abbreviation = ?");
-      args.push(normalizePillarAbbreviationInput(String(body.abbreviation ?? "")));
+      patch.abbreviation = normalizePillarAbbreviationInput(String(body.abbreviation ?? ""));
     }
-    if (sets.length === 0) {
+    if (Object.keys(patch).length === 0) {
       return NextResponse.json({ ok: false, error: "Nothing to update" }, { status: 400 });
     }
 
-    args.push(pillarId, user.id);
-    await turso.execute({
-      sql: `UPDATE pillars SET ${sets.join(", ")} WHERE id = ? AND user_id = ?;`,
-      args,
-    });
+    await updatePillar(user.id, pillarId, patch);
 
     return NextResponse.json({ ok: true });
   } catch (e: unknown) {
@@ -81,13 +75,7 @@ export const DELETE = async (_req: Request, { params }: Params) => {
       return NextResponse.json({ ok: false, error: "Invalid id" }, { status: 400 });
     }
 
-    const turso = requireTursoClient();
-    await ensureLifeSchema(turso);
-
-    await turso.execute({
-      sql: `DELETE FROM pillars WHERE id = ? AND user_id = ?;`,
-      args: [pillarId, user.id],
-    });
+    await deletePillar(user.id, pillarId);
 
     return NextResponse.json({ ok: true });
   } catch (e: unknown) {

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import PillarChip from "./PillarChip";
 import TaskMilestoneSelect from "./TaskMilestoneSelect";
 import TaskPillarSelect from "./TaskPillarSelect";
@@ -31,6 +31,7 @@ export default function TaskCardMeta({
   milestoneId,
   scheduleType,
   compact = false,
+  leading,
   onPillarChange,
   onMilestoneChange,
   onScheduleChange,
@@ -41,6 +42,7 @@ export default function TaskCardMeta({
   milestoneId: number | null;
   scheduleType?: string | null;
   compact?: boolean;
+  leading?: ReactNode;
   onPillarChange: (pillarId: number | null) => void;
   onMilestoneChange: (milestoneId: number | null) => void;
   onScheduleChange: (mode: TaskScheduleMode) => void;
@@ -81,6 +83,7 @@ export default function TaskCardMeta({
 
   return (
     <div className={`taskCardMeta ${compact ? "taskCardMetaCompact" : ""}`}>
+      {leading}
       {pillar ? (
         <PillarChip
           name={pillar.name}

@@ -1,39 +1,29 @@
 import { NextResponse } from "next/server";
-import { ensureLifeSchema } from "../../../src/db/life";
 import { requireSessionUser } from "../../../src/lib/auth";
 import { normalizePillarAbbreviationInput } from "../../../src/lib/pillar-abbreviation";
 import { isValidPillarColor, normalizePillarColor } from "../../../src/lib/pillar-colors";
-import { requireTursoClient } from "../../../src/lib/turso";
+import {
+  getMaxPillarRank,
+  insertPillar,
+  listPillars,
+} from "../../../src/lib/mongodb/store/users";
+import { listGoals } from "../../../src/lib/mongodb/store/goals";
+import { listMilestones } from "../../../src/lib/mongodb/store/milestones";
 
 export const GET = async () => {
   try {
     const user = await requireSessionUser();
-    const turso = requireTursoClient();
-    await ensureLifeSchema(turso);
-
-    const pillars = await turso.execute({
-      sql: `SELECT id, user_id, name, description, abbreviation, color, rank, created_at
-            FROM pillars WHERE user_id = ? ORDER BY rank ASC, id ASC;`,
-      args: [user.id],
-    });
-
-    const goals = await turso.execute({
-      sql: `SELECT id, user_id, pillar_id, title, target_date, rank, status, created_at
-            FROM goals WHERE user_id = ? ORDER BY rank ASC, id ASC;`,
-      args: [user.id],
-    });
-
-    const milestones = await turso.execute({
-      sql: `SELECT id, user_id, goal_id, pillar_id, title, target_date, rank, completed_at, created_at
-            FROM milestones WHERE user_id = ? ORDER BY rank ASC, id ASC;`,
-      args: [user.id],
-    });
+    const [pillars, goals, milestones] = await Promise.all([
+      listPillars(user.id),
+      listGoals(user.id),
+      listMilestones(user.id),
+    ]);
 
     return NextResponse.json({
       ok: true,
-      pillars: pillars.rows,
-      goals: goals.rows,
-      milestones: milestones.rows,
+      pillars,
+      goals,
+      milestones,
     });
   } catch (e: unknown) {
     const msg = e instanceof Error ? e.message : "Failed to load pillars";
@@ -60,34 +50,22 @@ export const POST = async (req: Request) => {
       return NextResponse.json({ ok: false, error: "Invalid color" }, { status: 400 });
     }
 
-    const turso = requireTursoClient();
-    await ensureLifeSchema(turso);
-
-    const maxRank = await turso.execute({
-      sql: `SELECT COALESCE(MAX(rank), -1) AS max_rank FROM pillars WHERE user_id = ?;`,
-      args: [user.id],
-    });
-    const rank = Number((maxRank.rows[0] as Record<string, unknown>).max_rank) + 1;
+    const rank = (await getMaxPillarRank(user.id)) + 1;
 
     const abbreviation =
       body.abbreviation !== undefined
         ? normalizePillarAbbreviationInput(String(body.abbreviation ?? ""))
         : null;
 
-    const result = await turso.execute({
-      sql: `INSERT INTO pillars (user_id, name, description, abbreviation, color, rank)
-            VALUES (?, ?, ?, ?, ?, ?) RETURNING id, user_id, name, description, abbreviation, color, rank, created_at;`,
-      args: [
-        user.id,
-        name,
-        body.description?.trim() || null,
-        abbreviation,
-        normalizePillarColor(color),
-        rank,
-      ],
+    const pillar = await insertPillar(user.id, {
+      name,
+      description: body.description?.trim() || null,
+      abbreviation,
+      color: normalizePillarColor(color),
+      rank,
     });
 
-    return NextResponse.json({ ok: true, pillar: result.rows[0] });
+    return NextResponse.json({ ok: true, pillar });
   } catch (e: unknown) {
     const msg = e instanceof Error ? e.message : "Failed to create pillar";
     const status = msg === "Unauthorized" ? 401 : 500;

@@ -1,15 +1,12 @@
-import type { Client } from "@libsql/client";
-import { ensureLifeSchema } from "../db/life";
 import { normalizeScheduleType } from "./task-schedule";
 import { taskBelongsInTodayPriorities } from "./task-schedule";
 import {
   boardItemKey,
-  parseMissionLayout,
   type MissionLayout,
 } from "./mission-layout";
+import { getMissionLayout, upsertMissionLayout } from "./mongodb/store/daily-logs";
 
 export async function appendCreatedTasksToMissionLayout(
-  turso: Client,
   userId: number,
   todayIso: string,
   createdTasks: {
@@ -22,16 +19,10 @@ export async function appendCreatedTasksToMissionLayout(
 ) {
   if (createdTasks.length === 0) return;
 
-  await ensureLifeSchema(turso);
-
-  const row = await turso.execute({
-    sql: `SELECT mission_layout FROM daily_logs WHERE user_id = ? AND log_date = ? LIMIT 1;`,
-    args: [userId, todayIso],
-  });
-
-  const layout: MissionLayout = parseMissionLayout(
-    (row.rows[0] as Record<string, unknown> | undefined)?.mission_layout as string | undefined
-  ) ?? { today: [], coming_up: [] };
+  const layout: MissionLayout = (await getMissionLayout(userId, todayIso)) ?? {
+    today: [],
+    coming_up: [],
+  };
 
   const todayKeys = new Set(layout.today.map((r) => boardItemKey(r.kind, r.id)));
   const comingKeys = new Set(layout.coming_up.map((r) => boardItemKey(r.kind, r.id)));
@@ -59,34 +50,20 @@ export async function appendCreatedTasksToMissionLayout(
     }
   }
 
-  await turso.execute({
-    sql: `INSERT INTO daily_logs (user_id, log_date, mission_layout, updated_at)
-          VALUES (?, ?, ?, datetime('now'))
-          ON CONFLICT(user_id, log_date) DO UPDATE SET
-            mission_layout = excluded.mission_layout,
-            updated_at = datetime('now');`,
-    args: [userId, todayIso, JSON.stringify(layout)],
-  });
+  await upsertMissionLayout(userId, todayIso, layout);
 }
 
 export async function promoteTasksToMissionLayoutToday(
-  turso: Client,
   userId: number,
   planDateIso: string,
   taskIds: number[]
 ) {
   if (taskIds.length === 0) return;
 
-  await ensureLifeSchema(turso);
-
-  const row = await turso.execute({
-    sql: `SELECT mission_layout FROM daily_logs WHERE user_id = ? AND log_date = ? LIMIT 1;`,
-    args: [userId, planDateIso],
-  });
-
-  const layout: MissionLayout = parseMissionLayout(
-    (row.rows[0] as Record<string, unknown> | undefined)?.mission_layout as string | undefined
-  ) ?? { today: [], coming_up: [] };
+  const layout: MissionLayout = (await getMissionLayout(userId, planDateIso)) ?? {
+    today: [],
+    coming_up: [],
+  };
 
   for (const id of taskIds) {
     const ref = { kind: "task" as const, id, pinned: true as const };
@@ -97,12 +74,5 @@ export async function promoteTasksToMissionLayoutToday(
     layout.today.unshift(ref);
   }
 
-  await turso.execute({
-    sql: `INSERT INTO daily_logs (user_id, log_date, mission_layout, updated_at)
-          VALUES (?, ?, ?, datetime('now'))
-          ON CONFLICT(user_id, log_date) DO UPDATE SET
-            mission_layout = excluded.mission_layout,
-            updated_at = datetime('now');`,
-    args: [userId, planDateIso, JSON.stringify(layout)],
-  });
+  await upsertMissionLayout(userId, planDateIso, layout);
 }

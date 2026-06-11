@@ -1,58 +1,53 @@
-import { convertToModelMessages, stepCountIs, streamText, type UIMessage } from "ai";
-import { formatAiUserMessage } from "../../../../src/lib/ai/ai-errors";
-import { loadMissionContextBlock, createMissionTools } from "../../../../src/lib/ai/mission-tools";
-import { MISSION_SYSTEM_PROMPT } from "../../../../src/lib/ai/mission-prompt";
+import { NextResponse } from "next/server";
 import {
-  assertChatProviderConfigured,
-  getAiModel,
-} from "../../../../src/lib/ai/provider";
+  runLifeAgent,
+  type LifeAgentMessage,
+} from "../../../../src/lib/adk/run-life-agent";
 import { requireSessionUser } from "../../../../src/lib/auth";
+import { isYyyyMmDd, todayIsoYyyyMmDd } from "../../../../src/lib/date";
 
-export const maxDuration = 30;
+export const runtime = "nodejs";
+export const maxDuration = 60;
 
 export async function POST(req: Request) {
-  let user;
   try {
-    user = await requireSessionUser();
-  } catch {
-    return Response.json({ error: "Unauthorized" }, { status: 401 });
-  }
+    const user = await requireSessionUser();
 
-  try {
-    assertChatProviderConfigured();
-  } catch (e) {
-    return Response.json(
-      { error: e instanceof Error ? e.message : "AI not configured" },
-      { status: 500 }
-    );
-  }
+    const body = (await req.json()) as {
+      message?: string;
+      plan_date?: string;
+      history?: LifeAgentMessage[];
+    };
 
-  let messages: UIMessage[];
-  try {
-    const body = await req.json();
-    messages = body.messages;
-    if (!Array.isArray(messages)) {
-      return Response.json({ error: "Invalid messages" }, { status: 400 });
+    const message = body.message?.trim() || "";
+    if (!message) {
+      return NextResponse.json({ ok: false, error: "message is required" }, { status: 400 });
     }
-  } catch {
-    return Response.json({ error: "Invalid JSON body" }, { status: 400 });
+
+    const planDate =
+      body.plan_date && isYyyyMmDd(body.plan_date)
+        ? body.plan_date
+        : todayIsoYyyyMmDd();
+
+    const history = (body.history ?? []).filter(
+      (m) =>
+        (m.role === "user" || m.role === "assistant") &&
+        typeof m.content === "string" &&
+        m.content.trim()
+    );
+
+    const reply = await runLifeAgent({
+      userId: user.id,
+      planDate,
+      message,
+      history,
+    });
+
+    return NextResponse.json({ ok: true, reply });
+  } catch (e: unknown) {
+    const msg = e instanceof Error ? e.message : "Chat failed";
+    const status = msg === "Unauthorized" ? 401 : 500;
+    console.error("[mission/chat]", e);
+    return NextResponse.json({ ok: false, error: msg }, { status });
   }
-
-  const contextBlock = await loadMissionContextBlock(user.id);
-  const tools = createMissionTools(user.id);
-
-  const result = streamText({
-    model: getAiModel(),
-    system: `${MISSION_SYSTEM_PROMPT}\n\n---\n\n${contextBlock}`,
-    messages: await convertToModelMessages(messages),
-    tools,
-    stopWhen: stepCountIs(5),
-    onError: ({ error }) => {
-      console.error("[mission/chat]", error);
-    },
-  });
-
-  return result.toUIMessageStreamResponse({
-    onError: formatAiUserMessage,
-  });
 }

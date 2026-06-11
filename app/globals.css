@@ -111,6 +111,98 @@ a {
   letter-spacing: 0.01em;
 }
 
+.pillNew {
+  border-color: #1a5f2a;
+  background: #e8f5e9;
+  color: #1a5f2a;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  font-size: 11px;
+}
+
+.proposedTasksModal {
+  max-width: 560px;
+}
+
+.proposedTasksList {
+  list-style: none;
+  margin: 0 0 16px;
+  padding: 0;
+  display: grid;
+  gap: 12px;
+}
+
+.proposedTaskCard {
+  display: grid;
+  gap: 10px;
+  padding: 14px;
+}
+
+.proposedTaskCardHead {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.proposedTaskRemoveBtn {
+  margin-left: auto;
+}
+
+.proposedTaskMetaRow {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+.proposedTaskMetaField {
+  min-width: 0;
+}
+
+@media (max-width: 520px) {
+  .proposedTaskMetaRow {
+    grid-template-columns: 1fr;
+  }
+}
+
+.wentWellReviewModal {
+  max-width: 580px;
+}
+
+.wentWellLogDateHint {
+  margin: -8px 0 12px;
+}
+
+.wentWellPillarToggles {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+
+.wentWellPillarToggle {
+  border: 1px solid rgba(0, 0, 0, 0.25);
+  border-radius: 999px;
+  padding: 2px 4px;
+  background: #ffffff;
+  cursor: pointer;
+}
+
+.wentWellPillarChipToggle {
+  padding: 0;
+  border: 2px solid transparent;
+  background: transparent;
+}
+
+.wentWellPillarToggleActive {
+  border-color: #000000;
+  box-shadow: 0 0 0 1px #000000;
+}
+
+.wentWellPillarHint {
+  margin: 4px 0 0;
+}
+
 .outlineButton {
   border: 1px solid #000000;
   border-radius: 10px;
@@ -505,6 +597,13 @@ a.outlineButton {
   gap: 16px;
 }
 
+.topbarActions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
 .topbarNav {
   display: flex;
   flex-wrap: wrap;
@@ -519,6 +618,261 @@ a.outlineButton {
   gap: 14px;
 }
 
+.authFormSubmit {
+  width: 100%;
+  margin-top: 4px;
+}
+
+.authPage {
+  min-height: calc(100vh - 49px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 40px 16px 72px;
+  background: linear-gradient(180deg, rgba(0, 0, 0, 0.03) 0%, #ffffff 45%);
+}
+
+.authPageStack {
+  width: 100%;
+  max-width: 440px;
+  display: grid;
+  gap: 28px;
+}
+
+.authPageFormCard {
+  border: 1px solid #000000;
+  border-radius: 16px;
+  padding: 28px 24px 24px;
+  background: #ffffff;
+}
+
+.authPageTitle {
+  font-size: 32px;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  margin: 0 0 6px;
+  line-height: 1.1;
+}
+
+.authPageSubtitle {
+  margin: 0 0 24px;
+  opacity: 0.7;
+  font-size: 15px;
+  line-height: 1.45;
+}
+
+.authPageAbout {
+  padding: 0 4px;
+}
+
+.authPageAboutTitle {
+  font-size: 12px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  margin: 0 0 8px;
+  opacity: 0.55;
+}
+
+.authPageAboutLead {
+  margin: 0 0 12px;
+  font-size: 15px;
+  line-height: 1.5;
+  font-weight: 600;
+}
+
+.authPageAboutList {
+  margin: 0;
+  padding-left: 18px;
+  font-size: 14px;
+  line-height: 1.55;
+  opacity: 0.85;
+  display: grid;
+  gap: 6px;
+}
+
+.authPageSignup {
+  display: grid;
+  gap: 12px;
+  text-align: center;
+}
+
+.authPageSignupPrompt {
+  margin: 0;
+  font-size: 14px;
+  opacity: 0.75;
+}
+
+.authPageSignupBtn {
+  display: block;
+  width: 100%;
+  text-align: center;
+  box-sizing: border-box;
+}
+
+.landingPage {
+  position: relative;
+  min-height: 100vh;
+  width: 100%;
+  overflow: hidden;
+  background: #000000;
+}
+
+.landingVideo {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.landingScrim {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    90deg,
+    rgba(0, 0, 0, 0.2) 0%,
+    rgba(0, 0, 0, 0.06) 45%,
+    rgba(0, 0, 0, 0.28) 100%
+  );
+}
+
+.landingLayout {
+  position: relative;
+  z-index: 1;
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: clamp(20px, 3vh, 40px) clamp(16px, 3vw, 32px);
+  box-sizing: border-box;
+  width: 100%;
+}
+
+.landingFrame {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 320px);
+  align-items: start;
+  gap: clamp(20px, 3vw, 36px);
+  width: min(960px, 100%);
+  padding: clamp(24px, 3vw, 32px);
+  border-radius: 16px;
+  background: rgba(0, 0, 0, 0.4);
+  backdrop-filter: blur(8px);
+  box-sizing: border-box;
+}
+
+.landingPanel {
+  width: 100%;
+  min-width: 0;
+  border: 1px solid rgba(0, 0, 0, 0.12);
+  border-radius: 14px;
+  padding: 24px 22px 20px;
+  background: rgba(255, 255, 255, 0.97);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.18);
+  box-sizing: border-box;
+}
+
+.landingPanelTitle {
+  font-size: 28px;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  margin: 0 0 6px;
+  line-height: 1.1;
+}
+
+.landingPanelSubtitle {
+  margin: 0 0 20px;
+  opacity: 0.7;
+  font-size: 14px;
+  line-height: 1.45;
+}
+
+.landingPanelFooter {
+  display: grid;
+  gap: 10px;
+  margin-top: 18px;
+  padding-top: 18px;
+  border-top: 1px solid rgba(0, 0, 0, 0.1);
+}
+
+.landingPanelFooterPrompt {
+  margin: 0;
+  font-size: 13px;
+  opacity: 0.75;
+  text-align: center;
+}
+
+.landingPanelFooterBtn {
+  display: block;
+  width: 100%;
+  text-align: center;
+  box-sizing: border-box;
+}
+
+.landingCopy {
+  color: #ffffff;
+  min-width: 0;
+  box-sizing: border-box;
+}
+
+.landingCopyTitle {
+  margin: 0 0 8px;
+  font-size: clamp(28px, 3.6vw, 40px);
+  font-weight: 800;
+  letter-spacing: -0.03em;
+  line-height: 1.1;
+  text-shadow: 0 2px 12px rgba(0, 0, 0, 0.55), 0 1px 3px rgba(0, 0, 0, 0.4);
+}
+
+.landingCopyTagline {
+  margin: 0 0 14px;
+  font-size: clamp(14px, 1.5vw, 16px);
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  opacity: 0.88;
+  text-shadow: 0 1px 8px rgba(0, 0, 0, 0.45);
+}
+
+.landingCopyLead {
+  margin: 0 0 18px;
+  font-size: clamp(14px, 1.5vw, 16px);
+  font-weight: 500;
+  line-height: 1.55;
+  opacity: 0.95;
+  text-shadow: 0 1px 10px rgba(0, 0, 0, 0.5), 0 1px 2px rgba(0, 0, 0, 0.35);
+}
+
+.landingCopyList {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: clamp(13px, 1.35vw, 14px);
+  line-height: 1.55;
+  opacity: 0.95;
+  display: grid;
+  gap: 12px;
+  text-shadow: 0 1px 8px rgba(0, 0, 0, 0.5), 0 1px 2px rgba(0, 0, 0, 0.3);
+}
+
+.landingCopyLabel {
+  font-weight: 800;
+}
+
+.landingPanel .authForm {
+  max-width: none;
+}
+
+@media (max-width: 960px) {
+  .landingFrame {
+    grid-template-columns: 1fr;
+    max-width: 400px;
+    gap: 20px;
+    padding: 24px 20px;
+  }
+}
+
 .inlineForm {
   display: flex;
   flex-wrap: wrap;
@@ -528,6 +882,30 @@ a.outlineButton {
 
 .inlineFormSmall {
   gap: 8px;
+}
+
+.invInput,
+.invInputDate {
+  box-sizing: border-box;
+  border: 1px solid #000000;
+  border-radius: 10px;
+  padding: 10px 12px;
+  font-size: 14px;
+  font-family: inherit;
+  line-height: 1.2;
+  min-height: 42px;
+  background: #ffffff;
+  color: #000000;
+}
+
+.invInput {
+  width: 100%;
+}
+
+.invInput:focus,
+.invInputDate:focus {
+  outline: 2px solid #000000;
+  outline-offset: 1px;
 }
 
 .invInputDate {
@@ -865,6 +1243,68 @@ a.outlineButton {
   flex-shrink: 0;
 }
 
+.taskDeadlineGroup {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.taskDateLockBtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.taskDateLockBtn:hover:not(:disabled) {
+  background: rgba(0, 0, 0, 0.04);
+}
+
+.taskDateLockBtn:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+.taskDateLockIcon {
+  display: block;
+}
+
+.taskDateLockFrame {
+  fill: none;
+  stroke: rgba(0, 0, 0, 0.28);
+  stroke-width: 1.25;
+}
+
+.taskDateLockGlyph {
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.25;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.taskDateLockBtnLocked {
+  color: #6b4500;
+  background: #fff8e6;
+}
+
+.taskDateLockBtnLocked .taskDateLockFrame {
+  stroke: #8a5a00;
+  stroke-width: 1.5;
+}
+
+.taskDateLockBtnLocked:hover:not(:disabled) {
+  background: #ffefc2;
+}
+
 .taskCheck input[type="checkbox"] {
   width: 18px;
   height: 18px;
@@ -883,6 +1323,131 @@ a.outlineButton {
 .dailyLogHistory {
   display: grid;
   gap: 8px;
+}
+
+.dailyLogPeriodBar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.dailyLogPeriodNav {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.dailyLogPeriodLabel {
+  margin: 0;
+  font-size: 20px;
+  font-weight: 800;
+  min-width: 10ch;
+  text-align: center;
+}
+
+.dailyLogPeriodBtn {
+  min-width: 36px;
+  padding-inline: 10px;
+}
+
+.dailyLogRangeForm {
+  display: grid;
+  gap: 12px;
+}
+
+.dailyLogRangeFields {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+}
+
+.dailyLogDayGroup {
+  display: grid;
+  gap: 10px;
+}
+
+.dailyLogDayHead {
+  display: grid;
+  gap: 2px;
+}
+
+.dailyLogDayTitle {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 800;
+}
+
+.dailyLogDaySubtitle {
+  margin: 0;
+}
+
+.dailyLogEntryKindWrap {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 6px 10px;
+}
+
+.dailyLogEntryDirection {
+  font-size: 10px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  padding: 2px 7px;
+  border-radius: 999px;
+  border: 1px solid rgba(0, 0, 0, 0.12);
+}
+
+.dailyLogEntryDirectionBack {
+  background: rgba(0, 0, 0, 0.04);
+}
+
+.dailyLogEntryDirectionForward {
+  background: rgba(0, 0, 0, 0.07);
+}
+
+.dailyLogEntryKindHint {
+  font-size: 12px;
+  opacity: 0.6;
+}
+
+.missionIntakeFieldHint {
+  margin: 4px 0 0;
+}
+
+.dailyLogEntryHead {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+
+.dailyLogEntryKind {
+  font-size: 12px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  opacity: 0.65;
+}
+
+.dailyLogEntryTags {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 8px;
+}
+
+.dailyLogEntryTagsLabel {
+  font-size: 11px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  opacity: 0.55;
 }
 
 .dailyLogHistoryTitle {
@@ -917,10 +1482,8 @@ a.outlineButton {
 }
 
 .dailyLogEntryTime {
-  display: block;
   font-size: 12px;
   opacity: 0.65;
-  margin-bottom: 4px;
 }
 
 .dailyLogEntryBody {
@@ -929,7 +1492,22 @@ a.outlineButton {
   line-height: 1.45;
 }
 
-.dailyLogAddOn {
+.dailyLogEntryInput {
+  display: block;
+  width: 100%;
+  max-width: 100%;
+  flex: none;
+  min-width: 0;
+  margin-top: 6px;
+  min-height: 120px;
+  resize: vertical;
+}
+
+.dailyLogEntryActions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
   margin-top: 8px;
 }
 
@@ -961,6 +1539,13 @@ a.outlineButton {
   background: #ffffff;
   isolation: isolate;
   z-index: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.missionChecklistAside .lifeAdminStats {
+  margin-top: 0;
 }
 
 .missionSectionHeader {
@@ -982,6 +1567,22 @@ a.outlineButton {
   gap: 12px;
 }
 
+.missionCheckInActions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.missionPrioritizeBtn {
+  flex-shrink: 0;
+}
+
+.missionBarError {
+  margin-top: 8px;
+}
+
 .missionCheckInBtn {
   flex-shrink: 0;
 }
@@ -990,8 +1591,45 @@ a.outlineButton {
   margin: 0;
 }
 
+.lifeAdminStats {
+  display: grid;
+  gap: 6px;
+  padding: 10px 14px;
+  border-radius: 10px;
+  background: rgba(0, 0, 0, 0.03);
+  font-size: 13px;
+  line-height: 1.4;
+}
+
+.lifeAdminStatsRow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px 16px;
+}
+
+.lifeAdminStatsLabel {
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  opacity: 0.65;
+  font-size: 12px;
+}
+
+.lifeAdminStatsItem strong {
+  font-weight: 800;
+}
+
 .missionCheckInModal {
   max-width: 520px;
+}
+
+.missionPrioritizeDayModal {
+  max-width: 440px;
+}
+
+.missionPrioritizeDayActions {
+  flex-wrap: wrap;
 }
 
 .missionIntakeCollapsed {
@@ -1011,6 +1649,10 @@ a.outlineButton {
 
 .missionThisWeekPanel {
   margin-top: 12px;
+}
+
+.missionThisWeekHeader {
+  margin-bottom: 12px;
 }
 
 @media (max-width: 980px) {
@@ -1066,6 +1708,20 @@ a.outlineButton {
 .missionReflectionText {
   margin: 0;
   line-height: 1.55;
+}
+
+.missionReflectionSection {
+  display: grid;
+  gap: 6px;
+}
+
+.missionReflectionSectionTitle {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  opacity: 0.65;
 }
 
 .missionReflectionBuckets {
@@ -1609,7 +2265,7 @@ a.outlineButton {
 
 .milestoneAddActions {
   display: flex;
-  align-items: center;
+  align-items: stretch;
   gap: 8px;
 }
 
@@ -1637,6 +2293,13 @@ a.outlineButton {
   flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
+  gap: 12px;
+}
+
+.pillarsToolbarActions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
   gap: 12px;
 }
 
@@ -1989,6 +2652,30 @@ a.outlineButton {
   background: #000;
   border-radius: 999px;
   transition: width 0.15s ease;
+}
+
+.recurringInactiveToggleWrap {
+  margin: 4px 0 0;
+  text-align: center;
+}
+
+.recurringInactiveToggle {
+  border: none;
+  background: none;
+  padding: 0;
+  font: inherit;
+  font-size: 13px;
+  color: rgba(0, 0, 0, 0.45);
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.recurringInactiveToggle:hover {
+  color: rgba(0, 0, 0, 0.7);
+}
+
+.recurringInactiveSection {
+  margin-top: 8px;
 }
 
 .recurringSetupForm {

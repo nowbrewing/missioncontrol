@@ -5,13 +5,11 @@ import {
   updateRecurringProgress,
 } from "../../../../src/lib/recurring-events";
 import type { RecurringProgress } from "../../../../src/lib/recurring-week";
-import { requireTursoClient } from "../../../../src/lib/turso";
 
 export const GET = async () => {
   try {
     const user = await requireSessionUser();
-    const turso = requireTursoClient();
-    const data = await ensureRecurringWeek(turso, user.id);
+    const data = await ensureRecurringWeek(user.id);
     return NextResponse.json({ ok: true, ...data });
   } catch (e: unknown) {
     const msg = e instanceof Error ? e.message : "Load failed";
@@ -45,9 +43,7 @@ export const PATCH = async (req: Request) => {
       return NextResponse.json({ ok: false, error: "Invalid kind" }, { status: 400 });
     }
 
-    const turso = requireTursoClient();
     await updateRecurringProgress(
-      turso,
       user.id,
       progressId,
       body.progress,

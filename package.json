@@ -7,28 +7,24 @@
     "dev:clean": "rm -rf .next && next dev",
     "build": "next build",
     "start": "next start",
-    "test:mcp": "bash scripts/test-mcp.sh"
+    "test:mcp": "bash scripts/test-mcp.sh",
+    "sync:mongo": "npx tsx scripts/sync-mongodb.ts"
   },
   "dependencies": {
-    "@ai-sdk/google": "^3.0.80",
-    "@ai-sdk/openai": "^3.0.66",
-    "@ai-sdk/react": "^3.0.194",
     "@dnd-kit/core": "^6.3.1",
     "@dnd-kit/sortable": "^10.0.0",
     "@dnd-kit/utilities": "^3.2.2",
     "@google/adk": "^1.2.0",
     "@google/genai": "^2.8.0",
-    "@libsql/client": "^0.15.15",
     "@modelcontextprotocol/sdk": "^1.29.0",
-    "ai": "^6.0.192",
     "mongodb": "^7.3.0",
     "next": "^15.5.2",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
-    "turso": "^0.6.0",
     "zod": "^4.4.3"
   },
   "devDependencies": {
+    "@libsql/client": "^0.15.15",
     "@types/node": "^22.18.0",
     "@types/react": "^18.3.12",
     "@types/react-dom": "^18.3.1",

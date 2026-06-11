@@ -1,8 +1,7 @@
 import { NextResponse } from "next/server";
-import { ensureLifeSchema } from "../../../../src/db/life";
 import { requireSessionUser } from "../../../../src/lib/auth";
 import { isYyyyMmDd } from "../../../../src/lib/date";
-import { requireTursoClient } from "../../../../src/lib/turso";
+import { deleteGoal, updateGoal } from "../../../../src/lib/mongodb/store/goals";
 
 type Params = { params: Promise<{ id: string }> };
 
@@ -24,22 +23,10 @@ export const PATCH = async (req: Request, { params }: Params) => {
       return NextResponse.json({ ok: false, error: "Invalid target_date" }, { status: 400 });
     }
 
-    const turso = requireTursoClient();
-    await ensureLifeSchema(turso);
-
-    await turso.execute({
-      sql: `UPDATE goals SET
-              title = COALESCE(?, title),
-              target_date = COALESCE(?, target_date),
-              status = COALESCE(?, status)
-            WHERE id = ? AND user_id = ?;`,
-      args: [
-        body.title?.trim() || null,
-        body.target_date !== undefined ? body.target_date : null,
-        body.status || null,
-        goalId,
-        user.id,
-      ],
+    await updateGoal(user.id, goalId, {
+      ...(body.title !== undefined ? { title: body.title.trim() } : {}),
+      ...(body.target_date !== undefined ? { targetDate: body.target_date } : {}),
+      ...(body.status !== undefined ? { status: body.status } : {}),
     });
 
     return NextResponse.json({ ok: true });
@@ -59,13 +46,7 @@ export const DELETE = async (_req: Request, { params }: Params) => {
       return NextResponse.json({ ok: false, error: "Invalid id" }, { status: 400 });
     }
 
-    const turso = requireTursoClient();
-    await ensureLifeSchema(turso);
-
-    await turso.execute({
-      sql: `DELETE FROM goals WHERE id = ? AND user_id = ?;`,
-      args: [goalId, user.id],
-    });
+    await deleteGoal(user.id, goalId);
 
     return NextResponse.json({ ok: true });
   } catch (e: unknown) {

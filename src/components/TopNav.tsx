@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { getSessionUser } from "../lib/auth";
+import LogoutButton from "./LogoutButton";
 
 export default async function TopNav() {
   const user = await getSessionUser();
@@ -11,13 +12,14 @@ export default async function TopNav() {
           Mission Control
         </Link>
         {user && (
-          <nav className="topbarNav">
-            <Link href="/mission">Mission</Link>
-            <Link href="/scheduling">Scheduling</Link>
-            <Link href="/pillars">Pillars</Link>
-            <Link href="/daily">Daily</Link>
-            <Link href="/tasks">Tasks</Link>
-          </nav>
+          <div className="topbarActions">
+            <nav className="topbarNav">
+              <Link href="/pillars">Pillars</Link>
+              <Link href="/scheduling">Routines</Link>
+              <Link href="/daily">Daily logs</Link>
+            </nav>
+            <LogoutButton />
+          </div>
         )}
       </div>
     </header>

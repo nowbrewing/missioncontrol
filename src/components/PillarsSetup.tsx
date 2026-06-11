@@ -791,6 +791,16 @@ export default function PillarsSetup({ onboarding = false }: { onboarding?: bool
     setCollapsed((prev) => ({ ...prev, [pillarId]: !prev[pillarId] }));
   }
 
+  function toggleAllCollapse() {
+    const allCollapsed =
+      pillars.length > 0 && pillars.every((pillar) => collapsed[pillar.id]);
+    if (allCollapsed) {
+      setCollapsed({});
+      return;
+    }
+    setCollapsed(Object.fromEntries(pillars.map((pillar) => [pillar.id, true])));
+  }
+
   function finishOnboarding() {
     router.push("/mission");
     router.refresh();
@@ -799,6 +809,8 @@ export default function PillarsSetup({ onboarding = false }: { onboarding?: bool
   if (loading) return <p className="subtitle">Loading pillars...</p>;
 
   const pillarIds = pillars.map((p) => `pillar-${p.id}`);
+  const allCollapsed =
+    pillars.length > 0 && pillars.every((pillar) => collapsed[pillar.id]);
 
   return (
     <div className="sections">
@@ -831,14 +843,23 @@ export default function PillarsSetup({ onboarding = false }: { onboarding?: bool
           <p className="sectionHint reorderHint">
             Drag ⠿ to reorder pillars. Tap ▸ to collapse or expand a card.
           </p>
-          <label className="filterToggle">
-            <input
-              type="checkbox"
-              checked={hideCompleted}
-              onChange={(e) => setHideCompleted(e.target.checked)}
-            />
-            Hide completed milestones
-          </label>
+          <div className="pillarsToolbarActions">
+            <button
+              type="button"
+              className="outlineButton"
+              onClick={toggleAllCollapse}
+            >
+              {allCollapsed ? "Expand all" : "Collapse all"}
+            </button>
+            <label className="filterToggle">
+              <input
+                type="checkbox"
+                checked={hideCompleted}
+                onChange={(e) => setHideCompleted(e.target.checked)}
+              />
+              Hide completed milestones
+            </label>
+          </div>
         </div>
       )}
 

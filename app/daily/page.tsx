@@ -6,10 +6,10 @@ export default function DailyPage() {
     <>
       <TopNav />
       <main className="container">
-        <h1 className="title">Daily log</h1>
+        <h1 className="title">Daily logs</h1>
         <p className="subtitle">
-          Review everything you&apos;ve logged for a day — each submission is timestamped.
-          Add more notes anytime.
+          Each check-in saves two entries: looking back (wins) and looking ahead (brain
+          dump). Both appear on the plan date.
         </p>
         <DailyLogForm />
       </main>

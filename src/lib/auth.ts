@@ -1,8 +1,15 @@
 import { randomBytes, scryptSync, timingSafeEqual } from "crypto";
 import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
-import { ensureUsersSchema, type UserRow } from "../db/users";
-import { requireTursoClient } from "./turso";
+import { ensureMongoReady } from "./mongodb/init";
+import {
+  createSession as createMongoSession,
+  deleteSession as deleteMongoSession,
+  getSessionUser as getMongoSessionUser,
+  type UserRow,
+} from "./mongodb/store";
+
+export type { UserRow };
 
 export const SESSION_COOKIE = "mr_session";
 const SESSION_DAYS = 30;
@@ -26,29 +33,22 @@ export function generateSessionToken(): string {
   return randomBytes(32).toString("hex");
 }
 
-function sessionExpiresAt(): string {
+function sessionExpiresAt(): Date {
   const d = new Date();
   d.setDate(d.getDate() + SESSION_DAYS);
-  return d.toISOString();
+  return d;
 }
 
 export async function createSession(userId: number): Promise<string> {
-  const turso = requireTursoClient();
-  await ensureUsersSchema(turso);
+  await ensureMongoReady();
   const token = generateSessionToken();
-  await turso.execute({
-    sql: `INSERT INTO sessions (user_id, token, expires_at) VALUES (?, ?, ?);`,
-    args: [userId, token, sessionExpiresAt()],
-  });
+  await createMongoSession(userId, token, sessionExpiresAt());
   return token;
 }
 
 export async function deleteSession(token: string) {
-  const turso = requireTursoClient();
-  await turso.execute({
-    sql: `DELETE FROM sessions WHERE token = ?;`,
-    args: [token],
-  });
+  await ensureMongoReady();
+  await deleteMongoSession(token);
 }
 
 export function setSessionCookie(res: NextResponse, token: string) {
@@ -76,27 +76,8 @@ export async function getSessionUser(): Promise<UserRow | null> {
   const token = cookieStore.get(SESSION_COOKIE)?.value;
   if (!token) return null;
 
-  const turso = requireTursoClient();
-  await ensureUsersSchema(turso);
-
-  const result = await turso.execute({
-    sql: `SELECT u.id, u.email, u.name, u.created_at
-          FROM sessions s
-          JOIN users u ON u.id = s.user_id
-          WHERE s.token = ? AND s.expires_at > datetime('now')
-          LIMIT 1;`,
-    args: [token],
-  });
-
-  const row = result.rows[0] as Record<string, unknown> | undefined;
-  if (!row) return null;
-
-  return {
-    id: Number(row.id),
-    email: String(row.email),
-    name: String(row.name),
-    created_at: String(row.created_at),
-  };
+  await ensureMongoReady();
+  return getMongoSessionUser(token);
 }
 
 export async function requireSessionUser(): Promise<UserRow> {

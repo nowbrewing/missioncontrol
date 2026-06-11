@@ -9,6 +9,7 @@ export type TaskBriefPatch = {
   deadline?: string | null;
   schedule_type?: string | null;
   window_start?: string | null;
+  date_locked?: boolean;
   pillar_name?: string | null;
   pillar_abbreviation?: string | null;
   pillar_color?: string | null;
@@ -39,6 +40,7 @@ export function patchTaskInBrief<T extends BriefSlice>(
     if (patch.deadline !== undefined) next.date = patch.deadline;
     if (patch.schedule_type !== undefined) next.schedule_type = patch.schedule_type;
     if (patch.window_start !== undefined) next.window_start = patch.window_start;
+    if (patch.date_locked !== undefined) next.date_locked = patch.date_locked;
     if (patch.pillar_name !== undefined) next.pillar_name = patch.pillar_name;
     if (patch.pillar_abbreviation !== undefined) {
       next.pillar_abbreviation = patch.pillar_abbreviation;

@@ -1,10 +1,9 @@
-import type { Client } from "@libsql/client";
-import { ensureLifeSchema } from "../db/life";
 import { isYyyyMmDd, todayIsoYyyyMmDd } from "./date";
+import { computeLifeAdminStats, enrichTaskPillarDisplay } from "./life-admin";
+import { ensureLifeAdminSetup } from "./life-admin-setup";
 import { resolvePillarAbbreviation } from "./pillar-abbreviation";
 import {
   buildMissionBoard,
-  parseMissionLayout,
   type BoardItem,
 } from "./mission-layout";
 import { buildReflectionDisplay } from "./mission-reflection-display";
@@ -15,52 +14,40 @@ import {
   type MissionMilestone,
   type MissionTask,
 } from "./mission-prioritize";
+import { getMissionLayout } from "./mongodb/store/daily-logs";
+import { listMilestones } from "./mongodb/store/milestones";
+import { listTasks } from "./mongodb/store/tasks";
+import { listPillars } from "./mongodb/store/users";
 
-export async function buildMissionBrief(
-  turso: Client,
-  userId: number,
-  focusDate?: string
-) {
-  await ensureLifeSchema(turso);
+export async function buildMissionBrief(userId: number, focusDate?: string) {
+  await ensureLifeAdminSetup(userId);
+
   const calendarToday = todayIsoYyyyMmDd();
-  const today =
-    focusDate && isYyyyMmDd(focusDate) ? focusDate : calendarToday;
+  const today = focusDate && isYyyyMmDd(focusDate) ? focusDate : calendarToday;
 
-  const [pillars, milestones, tasks, dailyLog] = await Promise.all([
-    turso.execute({
-      sql: `SELECT id, name, abbreviation, color, rank FROM pillars WHERE user_id = ? ORDER BY rank ASC, id ASC;`,
-      args: [userId],
-    }),
-    turso.execute({
-      sql: `SELECT id, title, target_date, completed_at, pillar_id FROM milestones
-            WHERE user_id = ? ORDER BY rank ASC, id ASC;`,
-      args: [userId],
-    }),
-    turso.execute({
-      sql: `SELECT id, title, description, deadline, completed_at, rank, pillar_id, milestone_id, schedule_type, window_start, recurring_event_id, recurring_slot, created_at
-            FROM tasks WHERE user_id = ?
-            ORDER BY completed_at IS NOT NULL, rank ASC, id ASC;`,
-      args: [userId],
-    }),
-    turso.execute({
-      sql: `SELECT mission_layout FROM daily_logs WHERE user_id = ? AND log_date = ? LIMIT 1;`,
-      args: [userId, today],
-    }),
+  const [pillars, milestones, tasks, savedLayout] = await Promise.all([
+    listPillars(userId),
+    listMilestones(userId),
+    listTasks(userId),
+    getMissionLayout(userId, today),
   ]);
 
-  const pillarById = new Map(
-    (pillars.rows as Record<string, unknown>[]).map((p) => [Number(p.id), p])
-  );
-  const pillarRankById = new Map(
-    (pillars.rows as Record<string, unknown>[]).map((p) => [Number(p.id), Number(p.rank)])
-  );
-  const milestoneById = new Map(
-    (milestones.rows as Record<string, unknown>[]).map((m) => [Number(m.id), m])
-  );
+  const pillarById = new Map(pillars.map((p) => [Number(p.id), p]));
+  const pillarRankById = new Map(pillars.map((p) => [Number(p.id), Number(p.rank)]));
+  const milestoneById = new Map(milestones.map((m) => [Number(m.id), m]));
 
-  const enrichedTasks: MissionTask[] = (tasks.rows as Record<string, unknown>[]).map((t) => {
-    const pillar = t.pillar_id ? pillarById.get(Number(t.pillar_id)) : null;
+  const enrichedTasks: MissionTask[] = tasks.map((t) => {
     const milestone = t.milestone_id ? milestoneById.get(Number(t.milestone_id)) : null;
+    const pillarDisplay = enrichTaskPillarDisplay(
+      t.pillar_id != null ? Number(t.pillar_id) : null,
+      pillars.map((p) => ({
+        id: Number(p.id),
+        name: String(p.name),
+        abbreviation: p.abbreviation as string | null | undefined,
+        color: String(p.color),
+      })),
+      resolvePillarAbbreviation
+    );
     return {
       id: Number(t.id),
       title: String(t.title),
@@ -76,21 +63,16 @@ export async function buildMissionBrief(
       pillar_id: t.pillar_id != null ? Number(t.pillar_id) : null,
       milestone_id: t.milestone_id != null ? Number(t.milestone_id) : null,
       created_at: String(t.created_at),
-      pillar_name: pillar ? String(pillar.name) : null,
-      pillar_abbreviation: pillar
-        ? resolvePillarAbbreviation(
-            String(pillar.name),
-            pillar.abbreviation as string | null | undefined
-          )
-        : null,
-      pillar_color: pillar ? String(pillar.color) : null,
+      pillar_name: pillarDisplay.pillar_name,
+      pillar_abbreviation: pillarDisplay.pillar_abbreviation,
+      pillar_color: pillarDisplay.pillar_color,
       milestone_title: milestone ? String(milestone.title) : null,
+      is_new: Number(t.is_new) === 1,
+      date_locked: Number(t.date_locked) === 1,
     };
   });
 
-  const enrichedMilestones: MissionMilestone[] = (
-    milestones.rows as Record<string, unknown>[]
-  ).map((m) => {
+  const enrichedMilestones: MissionMilestone[] = milestones.map((m) => {
     const pillar = m.pillar_id ? pillarById.get(Number(m.pillar_id)) : null;
     return {
       id: Number(m.id),
@@ -116,16 +98,14 @@ export async function buildMissionBrief(
     today
   );
 
-  const savedLayout = parseMissionLayout(
-    (dailyLog.rows[0] as Record<string, unknown> | undefined)?.mission_layout as string | undefined
-  );
   const board = buildMissionBoard(
     enrichedTasks,
     sortedTodayTasks,
     comingUpNext,
     enrichedMilestones,
     savedLayout,
-    today
+    today,
+    pillarRankById
   );
 
   const reflection = buildReflectionDisplay(
@@ -134,10 +114,29 @@ export async function buildMissionBrief(
     enrichedMilestones
   );
 
+  const life_admin = computeLifeAdminStats({
+    allTasks: enrichedTasks.map((t) => ({
+      id: t.id,
+      title: t.title,
+      deadline: t.deadline,
+      pillar_id: t.pillar_id,
+      completed_at: t.completed_at,
+      created_at: t.created_at,
+    })),
+    pillars: pillars.map((p) => ({
+      id: Number(p.id),
+      name: String(p.name),
+    })),
+    planDate: today,
+    todayTaskIds: board.today
+      .filter((item) => item.kind === "task")
+      .map((item) => item.id),
+  });
+
   return {
     today,
     calendar_today: calendarToday,
-    pillars: pillars.rows,
+    pillars,
     milestones: enrichedMilestones,
     tasks: enrichedTasks,
     today_priorities: sortedTodayTasks.slice(0, 8),
@@ -145,5 +144,6 @@ export async function buildMissionBrief(
     board_today: board.today,
     board_coming_up: board.coming_up,
     reflection,
+    life_admin,
   };
 }

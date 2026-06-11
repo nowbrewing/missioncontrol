@@ -15,7 +15,12 @@ export type TaskPlacementFields = TaskScheduleFields & {
   title?: string | null;
   recurring_event_id?: number | null;
   recurring_slot?: string | null;
+  date_locked?: boolean | number | null;
 };
+
+export function isDateLocked(task: { date_locked?: boolean | number | null }): boolean {
+  return Number(task.date_locked) === 1;
+}
 
 /** Runs and recurring spawn cards belong on exactly one calendar day (their deadline). */
 export function isDaySpecificScheduled(task: TaskPlacementFields): boolean {
@@ -121,10 +126,33 @@ export function windowUrgency(
   return "mid";
 }
 
+export function isOverdueTask(
+  task: TaskPlacementFields,
+  today: string
+): boolean {
+  if (!task.deadline || !isYyyyMmDd(task.deadline)) return false;
+  return task.deadline < today;
+}
+
+/** Open tasks past deadline should surface on Today until resolved (unless date-locked to another day). */
+export function shouldSurfaceOverdueOnToday(
+  task: TaskPlacementFields,
+  today: string
+): boolean {
+  if (isDateLocked(task) && task.deadline !== today) return false;
+  return isOverdueTask(task, today);
+}
+
 export function taskBelongsInTodayPriorities(
   task: TaskPlacementFields,
   today: string
 ): boolean {
+  if (shouldSurfaceOverdueOnToday(task, today)) return true;
+
+  if (isDateLocked(task)) {
+    return task.deadline === today;
+  }
+
   if (isDaySpecificScheduled(task)) {
     return task.deadline === today;
   }

@@ -5,7 +5,13 @@ import { useState } from "react";
 
 type Mode = "login" | "signup";
 
-export default function AuthForm({ mode }: { mode: Mode }) {
+export default function AuthForm({
+  mode,
+  embedded = false,
+}: {
+  mode: Mode;
+  embedded?: boolean;
+}) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const next =
@@ -50,7 +56,10 @@ export default function AuthForm({ mode }: { mode: Mode }) {
   }
 
   return (
-    <form className="authForm card" onSubmit={onSubmit}>
+    <form
+      className={embedded ? "authForm" : "authForm card"}
+      onSubmit={onSubmit}
+    >
       {mode === "signup" && (
         <div className="modalField">
           <label className="modalLabel" htmlFor="name">
@@ -101,7 +110,11 @@ export default function AuthForm({ mode }: { mode: Mode }) {
 
       {error && <p className="modalError">{error}</p>}
 
-      <button className="chatSendBtn" type="submit" disabled={loading} style={{ width: "100%" }}>
+      <button
+        className="chatSendBtn authFormSubmit"
+        type="submit"
+        disabled={loading}
+      >
         {loading ? "..." : mode === "login" ? "Sign in" : "Create account"}
       </button>
     </form>

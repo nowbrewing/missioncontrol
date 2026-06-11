@@ -299,6 +299,66 @@ function EventMetaPills({ event }: { event: RecurringEvent }) {
   );
 }
 
+function AddRoutineDialog({
+  form,
+  saving,
+  pillars,
+  milestones,
+  onChange,
+  onSubmit,
+  onClose,
+}: {
+  form: EventFormState;
+  saving: boolean;
+  pillars: Pillar[];
+  milestones: Milestone[];
+  onChange: (patch: Partial<EventFormState>) => void;
+  onSubmit: () => void;
+  onClose: () => void;
+}) {
+  return (
+    <div
+      className="modalOverlay"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="add-routine-title"
+      onClick={(e) => e.target === e.currentTarget && onClose()}
+    >
+      <div className="modalCard">
+        <h2 id="add-routine-title" className="modalTitle">
+          Add routine
+        </h2>
+        <p className="modalNote">
+          Habits and routines that reset every Monday. Track progress on the Mission
+          checklist.
+        </p>
+        <div className="modalForm">
+          <EventFormFieldsWithPillars
+            form={form}
+            onChange={onChange}
+            idPrefix="add"
+            pillars={pillars}
+            milestones={milestones}
+          />
+        </div>
+        <div className="modalActions">
+          <button type="button" className="outlineButton" onClick={onClose} disabled={saving}>
+            Cancel
+          </button>
+          <button
+            type="button"
+            className="chatSendBtn"
+            onClick={onSubmit}
+            disabled={saving || !form.title.trim()}
+          >
+            {saving ? "Adding..." : "Add routine"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function EventListItem({
   event,
   onEdit,
@@ -354,6 +414,8 @@ export default function RecurringEventsSetup({
   const [events, setEvents] = useState<RecurringEvent[]>([]);
   const [loading, setLoading] = useState(true);
   const [addForm, setAddForm] = useState<EventFormState>({ ...EMPTY_FORM });
+  const [showAddRoutine, setShowAddRoutine] = useState(false);
+  const [showInactive, setShowInactive] = useState(false);
   const [editForm, setEditForm] = useState<EventFormState | null>(null);
   const [editingId, setEditingId] = useState<number | null>(null);
   const [saving, setSaving] = useState(false);
@@ -369,6 +431,16 @@ export default function RecurringEventsSetup({
     load();
   }, [load]);
 
+  function resetAddForm() {
+    setAddForm({ ...EMPTY_FORM, dailyDays: [...DEFAULT_DAILY_DAYS] });
+  }
+
+  function closeAddRoutineDialog() {
+    if (saving) return;
+    setShowAddRoutine(false);
+    resetAddForm();
+  }
+
   async function addEvent() {
     if (!addForm.title.trim() || saving) return;
     setSaving(true);
@@ -378,7 +450,8 @@ export default function RecurringEventsSetup({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(buildEventPayload(addForm)),
       });
-      setAddForm({ ...EMPTY_FORM, dailyDays: [...DEFAULT_DAILY_DAYS] });
+      setShowAddRoutine(false);
+      resetAddForm();
       await load();
       onChanged?.();
     } finally {
@@ -444,32 +517,22 @@ export default function RecurringEventsSetup({
 
   return (
     <div className="recurringSetup">
-      <p className="sectionHint">
-        Habits and routines that reset every Monday. Deactivated items stay saved but
-        disappear from the Mission Control checklist.
-      </p>
-
-      <div className="recurringSetupForm card">
-        <EventFormFieldsWithPillars
-          form={addForm}
-          onChange={(patch) => setAddForm((prev) => ({ ...prev, ...patch }))}
-          idPrefix="add"
-          pillars={pillars}
-          milestones={milestones}
-        />
+      <div className="pillarsPageHeader">
+        <p className="sectionHint" style={{ margin: 0 }}>
+          Habits and routines that reset every Monday. Deactivated items stay saved but
+          disappear from the Mission Control checklist.
+        </p>
         <button
           type="button"
-          className="outlineButton"
-          onClick={addEvent}
-          disabled={saving || !addForm.title.trim()}
+          className="chatSendBtn"
+          onClick={() => setShowAddRoutine(true)}
         >
-          {saving ? "Adding..." : "Add recurring item"}
+          Add routine
         </button>
       </div>
 
       {activeEvents.length > 0 && (
         <section className="section">
-          <h2 className="sectionTitle">Active</h2>
           <ul className="recurringSetupList">
             {activeEvents.map((event) => (
               <EventListItem
@@ -484,10 +547,8 @@ export default function RecurringEventsSetup({
         </section>
       )}
 
-      {inactiveEvents.length > 0 && (
-        <section className="section">
-          <h2 className="sectionTitle">Inactive</h2>
-          <p className="sectionHint">Reactivate anytime — history is kept.</p>
+      {showInactive && inactiveEvents.length > 0 && (
+        <section className="section recurringInactiveSection">
           <ul className="recurringSetupList">
             {inactiveEvents.map((event) => (
               <EventListItem
@@ -502,10 +563,40 @@ export default function RecurringEventsSetup({
         </section>
       )}
 
+      {inactiveEvents.length > 0 && (
+        <p className="recurringInactiveToggleWrap">
+          <button
+            type="button"
+            className="recurringInactiveToggle"
+            onClick={() => setShowInactive((prev) => !prev)}
+            aria-expanded={showInactive}
+          >
+            {showInactive
+              ? "Hide deactivated routines"
+              : `Show deactivated routines (${inactiveEvents.length})`}
+          </button>
+        </p>
+      )}
+
       {events.length === 0 && (
         <div className="card recurringChecklistEmpty">
-          <p style={{ margin: 0, opacity: 0.8 }}>No recurring items yet.</p>
+          <p style={{ margin: 0, opacity: 0.8 }}>
+            No routines yet. Click <strong>Add routine</strong> to create your first
+            habit.
+          </p>
         </div>
+      )}
+
+      {showAddRoutine && (
+        <AddRoutineDialog
+          form={addForm}
+          saving={saving}
+          pillars={pillars}
+          milestones={milestones}
+          onChange={(patch) => setAddForm((prev) => ({ ...prev, ...patch }))}
+          onSubmit={addEvent}
+          onClose={closeAddRoutineDialog}
+        />
       )}
 
       {editingId != null && editForm && (

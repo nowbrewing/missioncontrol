@@ -1,12 +1,11 @@
 import { NextResponse } from "next/server";
-import { ensureUsersSchema } from "../../../../src/db/users";
 import {
   createSession,
   hashPassword,
   isValidEmail,
   setSessionCookie,
 } from "../../../../src/lib/auth";
-import { requireTursoClient } from "../../../../src/lib/turso";
+import { createUser, findUserByEmail } from "../../../../src/lib/mongodb/store/users";
 
 export const POST = async (req: Request) => {
   try {
@@ -33,30 +32,19 @@ export const POST = async (req: Request) => {
       );
     }
 
-    const turso = requireTursoClient();
-    await ensureUsersSchema(turso);
-
-    const existing = await turso.execute({
-      sql: `SELECT id FROM users WHERE email = ? LIMIT 1;`,
-      args: [email],
-    });
-    if (existing.rows.length > 0) {
+    const existing = await findUserByEmail(email);
+    if (existing) {
       return NextResponse.json(
         { ok: false, error: "An account with this email already exists" },
         { status: 409 }
       );
     }
 
-    const result = await turso.execute({
-      sql: `INSERT INTO users (email, name, password_hash) VALUES (?, ?, ?) RETURNING id;`,
-      args: [email, name, hashPassword(password)],
-    });
-    const userId = Number((result.rows[0] as Record<string, unknown>).id);
-
-    const token = await createSession(userId);
+    const user = await createUser(email, name, hashPassword(password));
+    const token = await createSession(user.id);
     const res = NextResponse.json({
       ok: true,
-      user: { id: userId, email, name },
+      user: { id: user.id, email, name },
     });
     setSessionCookie(res, token);
     return res;

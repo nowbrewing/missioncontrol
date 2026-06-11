@@ -1,8 +1,11 @@
 import { NextResponse } from "next/server";
-import { ensureLifeSchema } from "../../../src/db/life";
 import { requireSessionUser } from "../../../src/lib/auth";
 import { isYyyyMmDd } from "../../../src/lib/date";
-import { requireTursoClient } from "../../../src/lib/turso";
+import {
+  getMaxGoalRank,
+  insertGoal,
+} from "../../../src/lib/mongodb/store/goals";
+import { listPillars } from "../../../src/lib/mongodb/store/users";
 
 export const POST = async (req: Request) => {
   try {
@@ -25,31 +28,20 @@ export const POST = async (req: Request) => {
       return NextResponse.json({ ok: false, error: "Invalid target_date" }, { status: 400 });
     }
 
-    const turso = requireTursoClient();
-    await ensureLifeSchema(turso);
-
-    const pillar = await turso.execute({
-      sql: `SELECT id FROM pillars WHERE id = ? AND user_id = ?;`,
-      args: [pillarId, user.id],
-    });
-    if (pillar.rows.length === 0) {
+    const pillars = await listPillars(user.id);
+    if (!pillars.some((pillar) => Number(pillar.id) === pillarId)) {
       return NextResponse.json({ ok: false, error: "Pillar not found" }, { status: 404 });
     }
 
-    const maxRank = await turso.execute({
-      sql: `SELECT COALESCE(MAX(rank), -1) AS max_rank FROM goals WHERE pillar_id = ? AND user_id = ?;`,
-      args: [pillarId, user.id],
-    });
-    const rank = Number((maxRank.rows[0] as Record<string, unknown>).max_rank) + 1;
-
-    const result = await turso.execute({
-      sql: `INSERT INTO goals (user_id, pillar_id, title, target_date, rank)
-            VALUES (?, ?, ?, ?, ?)
-            RETURNING id, user_id, pillar_id, title, target_date, rank, status, created_at;`,
-      args: [user.id, pillarId, title, body.target_date ?? null, rank],
+    const rank = (await getMaxGoalRank(user.id)) + 1;
+    const goal = await insertGoal(user.id, {
+      pillarId,
+      title,
+      targetDate: body.target_date ?? null,
+      rank,
     });
 
-    return NextResponse.json({ ok: true, goal: result.rows[0] });
+    return NextResponse.json({ ok: true, goal });
   } catch (e: unknown) {
     const msg = e instanceof Error ? e.message : "Failed to create goal";
     const status = msg === "Unauthorized" ? 401 : 500;

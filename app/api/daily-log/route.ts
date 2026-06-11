@@ -1,31 +1,62 @@
 import { NextResponse } from "next/server";
-import { ensureLifeSchema } from "../../../src/db/life";
 import { requireSessionUser } from "../../../src/lib/auth";
 import { isYyyyMmDd, todayIsoYyyyMmDd } from "../../../src/lib/date";
 import {
   appendDailyLogEntries,
   buildDailyLogAggregate,
+  groupEntriesByKind,
+  listDailyLogEntriesInRange,
   type DailyLogKind,
 } from "../../../src/lib/daily-log-entries";
-import { requireTursoClient } from "../../../src/lib/turso";
+import { listPillars } from "../../../src/lib/mongodb/store/users";
+
+async function pillarsForResponse(userId: number) {
+  const pillars = await listPillars(userId);
+  return pillars.map((p) => ({
+    id: Number(p.id),
+    name: String(p.name),
+    abbreviation: p.abbreviation ?? null,
+    color: String(p.color ?? "#FF6F61"),
+    rank: Number(p.rank),
+  }));
+}
 
 export const GET = async (req: Request) => {
   try {
     const user = await requireSessionUser();
     const url = new URL(req.url);
+    const from = url.searchParams.get("from");
+    const to = url.searchParams.get("to");
+    const pillars = await pillarsForResponse(user.id);
+
+    if (from && to) {
+      if (!isYyyyMmDd(from) || !isYyyyMmDd(to)) {
+        return NextResponse.json({ ok: false, error: "Invalid date range" }, { status: 400 });
+      }
+      if (from > to) {
+        return NextResponse.json(
+          { ok: false, error: "Start date must be on or before end date" },
+          { status: 400 }
+        );
+      }
+
+      const entries = await listDailyLogEntriesInRange(user.id, from, to);
+      return NextResponse.json({
+        ok: true,
+        from,
+        to,
+        entries,
+        by_kind: groupEntriesByKind(entries),
+        pillars,
+      });
+    }
+
     const date = url.searchParams.get("date") ?? todayIsoYyyyMmDd();
     if (!isYyyyMmDd(date)) {
       return NextResponse.json({ ok: false, error: "Invalid date" }, { status: 400 });
     }
 
-    const turso = requireTursoClient();
-    await ensureLifeSchema(turso);
-
-    const { entries, by_kind, aggregate } = await buildDailyLogAggregate(
-      turso,
-      user.id,
-      date
-    );
+    const { entries, by_kind, aggregate } = await buildDailyLogAggregate(user.id, date);
 
     return NextResponse.json({
       ok: true,
@@ -33,6 +64,7 @@ export const GET = async (req: Request) => {
       entries,
       by_kind,
       aggregate,
+      pillars,
       log: {
         log_date: date,
         went_well: aggregate.went_well || null,
@@ -62,9 +94,6 @@ export const POST = async (req: Request) => {
       return NextResponse.json({ ok: false, error: "Invalid date" }, { status: 400 });
     }
 
-    const turso = requireTursoClient();
-    await ensureLifeSchema(turso);
-
     const toAppend: { kind: DailyLogKind; content: string }[] = [];
     if (body.went_well?.trim()) {
       toAppend.push({ kind: "went_well", content: body.went_well });
@@ -83,12 +112,8 @@ export const POST = async (req: Request) => {
       );
     }
 
-    const created = await appendDailyLogEntries(turso, user.id, logDate, toAppend);
-    const { entries, by_kind, aggregate } = await buildDailyLogAggregate(
-      turso,
-      user.id,
-      logDate
-    );
+    const created = await appendDailyLogEntries(user.id, logDate, toAppend);
+    const { entries, by_kind, aggregate } = await buildDailyLogAggregate(user.id, logDate);
 
     return NextResponse.json({
       ok: true,

@@ -1,12 +1,11 @@
 import { NextResponse } from "next/server";
-import { ensureUsersSchema } from "../../../../src/db/users";
 import {
   createSession,
   isValidEmail,
   setSessionCookie,
   verifyPassword,
 } from "../../../../src/lib/auth";
-import { requireTursoClient } from "../../../../src/lib/turso";
+import { findUserWithPassword } from "../../../../src/lib/mongodb/store/users";
 
 export const POST = async (req: Request) => {
   try {
@@ -21,28 +20,21 @@ export const POST = async (req: Request) => {
       );
     }
 
-    const turso = requireTursoClient();
-    await ensureUsersSchema(turso);
-
-    const result = await turso.execute({
-      sql: `SELECT id, email, name, password_hash FROM users WHERE email = ? LIMIT 1;`,
-      args: [email],
-    });
-    const row = result.rows[0] as Record<string, unknown> | undefined;
-    if (!row || !verifyPassword(password, String(row.password_hash))) {
+    const user = await findUserWithPassword(email);
+    if (!user || !verifyPassword(password, user.passwordHash)) {
       return NextResponse.json(
         { ok: false, error: "Invalid email or password" },
         { status: 401 }
       );
     }
 
-    const token = await createSession(Number(row.id));
+    const token = await createSession(user.tursoId);
     const res = NextResponse.json({
       ok: true,
       user: {
-        id: Number(row.id),
-        email: String(row.email),
-        name: String(row.name),
+        id: user.tursoId,
+        email: user.email,
+        name: user.name,
       },
     });
     setSessionCookie(res, token);

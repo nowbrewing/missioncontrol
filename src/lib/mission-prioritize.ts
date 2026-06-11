@@ -16,6 +16,8 @@ export type MissionTask = {
   pillar_id: number | null;
   milestone_id: number | null;
   created_at: string;
+  is_new?: boolean;
+  date_locked?: boolean;
   pillar_name?: string | null;
   pillar_abbreviation?: string | null;
   pillar_color?: string | null;

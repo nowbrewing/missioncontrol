@@ -1,28 +1,22 @@
 import { NextResponse } from "next/server";
-import { ensureLifeSchema } from "../../../src/db/life";
 import { requireSessionUser } from "../../../src/lib/auth";
 import {
   DEFAULT_DAILY_DAYS,
-  serializeDailyDays,
   type RecurringKind,
 } from "../../../src/lib/recurring-week";
-import { requireTursoClient } from "../../../src/lib/turso";
+import {
+  getMaxRoutineRank,
+  insertRoutine,
+  listAllRoutines,
+} from "../../../src/lib/mongodb/store/routines";
 
 const KINDS: RecurringKind[] = ["daily", "count"];
 
 export const GET = async () => {
   try {
     const user = await requireSessionUser();
-    const turso = requireTursoClient();
-    await ensureLifeSchema(turso);
-
-    const result = await turso.execute({
-      sql: `SELECT id, title, kind, target_count, daily_days, tally_enabled, pillar_id, milestone_id, spawn_task_cards, active, rank, created_at
-            FROM recurring_events WHERE user_id = ? ORDER BY rank ASC, id ASC;`,
-      args: [user.id],
-    });
-
-    return NextResponse.json({ ok: true, events: result.rows });
+    const events = await listAllRoutines(user.id);
+    return NextResponse.json({ ok: true, events });
   } catch (e: unknown) {
     const msg = e instanceof Error ? e.message : "Load failed";
     const status = msg === "Unauthorized" ? 401 : 500;
@@ -63,9 +57,9 @@ export const POST = async (req: Request) => {
       targetCount = 0;
     }
 
-    const dailyDays =
+    const resolvedDailyDays =
       kind === "daily" && Array.isArray(body.daily_days) && body.daily_days.length === 7
-        ? serializeDailyDays(body.daily_days.map(Boolean) as [
+        ? (body.daily_days.map(Boolean) as [
             boolean,
             boolean,
             boolean,
@@ -74,38 +68,23 @@ export const POST = async (req: Request) => {
             boolean,
             boolean,
           ])
-        : kind === "daily"
-          ? serializeDailyDays(DEFAULT_DAILY_DAYS)
-          : null;
+        : DEFAULT_DAILY_DAYS;
 
-    const turso = requireTursoClient();
-    await ensureLifeSchema(turso);
+    const rank = (await getMaxRoutineRank(user.id)) + 1;
 
-    const maxRank = await turso.execute({
-      sql: `SELECT COALESCE(MAX(rank), -1) AS max_rank FROM recurring_events WHERE user_id = ?;`,
-      args: [user.id],
-    });
-    const rank = Number((maxRank.rows[0] as Record<string, unknown>).max_rank) + 1;
-
-    const result = await turso.execute({
-      sql: `INSERT INTO recurring_events (user_id, title, kind, target_count, daily_days, tally_enabled, pillar_id, milestone_id, spawn_task_cards, rank)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            RETURNING id, title, kind, target_count, daily_days, tally_enabled, pillar_id, milestone_id, spawn_task_cards, active, rank, created_at;`,
-      args: [
-        user.id,
-        title,
-        kind,
-        targetCount,
-        dailyDays,
-        tallyEnabled ? 1 : 0,
-        body.pillar_id ?? null,
-        body.milestone_id ?? null,
-        body.spawn_task_cards ? 1 : 0,
-        rank,
-      ],
+    const event = await insertRoutine(user.id, {
+      title,
+      kind,
+      targetCount,
+      dailyDays: resolvedDailyDays,
+      tallyEnabled,
+      pillarId: body.pillar_id ?? null,
+      milestoneId: body.milestone_id ?? null,
+      spawnTaskCards: !!body.spawn_task_cards,
+      rank,
     });
 
-    return NextResponse.json({ ok: true, event: result.rows[0] });
+    return NextResponse.json({ ok: true, event });
   } catch (e: unknown) {
     const msg = e instanceof Error ? e.message : "Create failed";
     const status = msg === "Unauthorized" ? 401 : 500;

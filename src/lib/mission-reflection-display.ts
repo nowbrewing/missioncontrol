@@ -13,6 +13,8 @@ export type ReflectionBucketItem = {
 
 export type MissionReflectionDisplay = {
   reflection: string;
+  kickoff: string | null;
+  rest_of_day: string | null;
   flags: string[];
   buckets: {
     today: ReflectionBucketItem[];
@@ -65,6 +67,8 @@ export function buildReflectionDisplay(
 
   return {
     reflection: snapshot.reflection,
+    kickoff: snapshot.kickoff ?? null,
+    rest_of_day: snapshot.rest_of_day ?? null,
     flags: snapshot.flags,
     buckets: {
       today: resolveBucket(snapshot.buckets.today),

@@ -1,6 +1,7 @@
 "use client";
 
 import { resolvePillarAbbreviation } from "../lib/pillar-abbreviation";
+import { LIFE_ADMIN_PILLAR_NAME, selectablePillars } from "../lib/life-admin";
 
 type Pillar = {
   id: number;
@@ -20,6 +21,9 @@ export default function TaskPillarSelect({
   compact?: boolean;
 }) {
   const selected = value ? pillars.find((p) => p.id === value) : null;
+  const lifeAdminLabel = compact
+    ? resolvePillarAbbreviation(LIFE_ADMIN_PILLAR_NAME, "ADMIN")
+    : LIFE_ADMIN_PILLAR_NAME;
 
   return (
     <select
@@ -27,10 +31,10 @@ export default function TaskPillarSelect({
       value={value ?? ""}
       onChange={(e) => onChange(e.target.value ? Number(e.target.value) : null)}
       aria-label="Pillar"
-      title={selected ? selected.name : undefined}
+      title={selected ? selected.name : lifeAdminLabel}
     >
-      <option value="">{compact ? "—" : "No pillar"}</option>
-      {pillars.map((p) => {
+      <option value="">{lifeAdminLabel}</option>
+      {selectablePillars(pillars).map((p) => {
         const label = compact
           ? resolvePillarAbbreviation(p.name, p.abbreviation)
           : p.name;

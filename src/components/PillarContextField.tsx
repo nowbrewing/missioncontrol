@@ -5,7 +5,7 @@ import { todayIsoYyyyMmDd } from "../lib/date";
 import { parsePillarContext } from "../lib/pillar-context";
 
 const CONTEXT_TOOLTIP =
-  "Add notes about what this pillar means to you. Each entry stacks on top — nothing is overwritten. Mission Control uses this history for context. Remove a specific note only when you want the system to forget that line.";
+  "Stack notes about active projects and what this pillar means. Use nicknames you'll say in check-in (e.g. \"Hackathon — portfolio + learning for digital consultancy\"). Mission Control uses this to understand shorthand like \"hackathon\" later.";
 
 function truncateForConfirm(text: string, maxLen = 120) {
   const trimmed = text.trim();
@@ -59,7 +59,7 @@ function AddContextDialog({
                   onSubmit();
                 }
               }}
-              placeholder="What does this pillar mean to you right now?"
+              placeholder="e.g. Hackathon — learning + portfolio boost for digital consultancy"
               disabled={saving}
               autoFocus
             />

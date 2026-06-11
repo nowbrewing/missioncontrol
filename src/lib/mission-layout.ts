@@ -1,4 +1,4 @@
-import { isDaySpecificScheduled, taskBelongsInTodayPriorities } from "./task-schedule";
+import { isDaySpecificScheduled, shouldSurfaceOverdueOnToday, taskBelongsInTodayPriorities } from "./task-schedule";
 import type { ComingUpItem, MissionMilestone, MissionTask } from "./mission-prioritize";
 
 export type MissionLayoutRef = {
@@ -17,6 +17,8 @@ export type MissionReflectionBuckets = {
 
 export type MissionReflectionSnapshot = {
   reflection: string;
+  kickoff?: string;
+  rest_of_day?: string;
   flags: string[];
   buckets: MissionReflectionBuckets;
   generated_at: string;
@@ -27,6 +29,8 @@ export type MissionLayout = {
   coming_up: MissionLayoutRef[];
   /** Tasks/milestones assigned to Later — excluded from auto-merge onto the board. */
   later?: MissionLayoutRef[];
+  /** When true, preserve today column order from layout; otherwise sort by due date + pillar rank. */
+  today_user_ordered?: boolean;
   reflection?: MissionReflectionSnapshot;
 };
 
@@ -46,6 +50,8 @@ export type BoardItem = {
   milestone_title?: string | null;
   completed_at?: string | null;
   created_at?: string;
+  is_new?: boolean;
+  date_locked?: boolean;
 };
 
 export function boardItemKey(kind: "task" | "milestone", id: number) {
@@ -59,6 +65,27 @@ export function sortComingUpByDate(items: BoardItem[]): BoardItem[] {
     if (!b.date) return -1;
     const byDate = a.date.localeCompare(b.date);
     return byDate !== 0 ? byDate : a.title.localeCompare(b.title);
+  });
+}
+
+/** Default Today column order: earliest due first, then higher-priority pillar (lower rank). */
+export function sortTodayBoardItems(
+  items: BoardItem[],
+  pillarRankById: Map<number, number>
+): BoardItem[] {
+  return [...items].sort((a, b) => {
+    const dateA = a.date ?? "9999-12-31";
+    const dateB = b.date ?? "9999-12-31";
+    const byDate = dateA.localeCompare(dateB);
+    if (byDate !== 0) return byDate;
+
+    const rankA =
+      a.pillar_id != null ? pillarRankById.get(a.pillar_id) ?? 999 : 999;
+    const rankB =
+      b.pillar_id != null ? pillarRankById.get(b.pillar_id) ?? 999 : 999;
+    if (rankA !== rankB) return rankA - rankB;
+
+    return a.title.localeCompare(b.title);
   });
 }
 
@@ -90,6 +117,8 @@ function taskToBoardItem(task: MissionTask): BoardItem {
     milestone_title: task.milestone_title,
     completed_at: task.completed_at,
     created_at: task.created_at,
+    is_new: task.is_new,
+    date_locked: task.date_locked,
   };
 }
 
@@ -150,7 +179,8 @@ export function buildMissionBoard(
   comingUpNext: ComingUpItem[],
   milestones: MissionMilestone[],
   savedLayout: MissionLayout | null,
-  todayIso: string
+  todayIso: string,
+  pillarRankById: Map<number, number> = new Map()
 ) {
   const taskById = new Map(allTasks.map((t) => [t.id, t]));
   const milestoneById = new Map(milestones.map((m) => [m.id, m]));
@@ -191,8 +221,13 @@ export function buildMissionBoard(
   );
 
   if (!savedLayout) {
-    return { today: defaultToday, coming_up: defaultComingUp };
+    return {
+      today: sortTodayBoardItems(defaultToday, pillarRankById),
+      coming_up: defaultComingUp,
+    };
   }
+
+  const userOrderedToday = savedLayout.today_user_ordered === true;
 
   const pinnedByKey = new Map(
     savedLayout.today.map((ref) => [boardItemKey(ref.kind, ref.id), !!ref.pinned])
@@ -214,8 +249,10 @@ export function buildMissionBoard(
 
     const pinned = pinnedByKey.get(item.key);
     const belongs = taskBelongsInTodayPriorities(task, todayIso);
+    const dateLocked = Number(task.date_locked) === 1;
     // Day-specific runs/recurring cards follow their deadline, not stale layout pins.
-    if (belongs || (pinned && !isDaySpecificScheduled(task))) {
+    // Date-locked tasks only appear on their deadline day.
+    if (belongs || (pinned && !isDaySpecificScheduled(task) && !dateLocked)) {
       today.push(item);
     } else {
       displaced.push(item);
@@ -254,12 +291,34 @@ export function buildMissionBoard(
     }
   }
 
-  return { today, coming_up: sortComingUpByDate(coming_up) };
+  const overduePromoted: BoardItem[] = [];
+  const comingUpFiltered = coming_up.filter((item) => {
+    if (item.kind !== "task" || laterKeys.has(item.key)) return true;
+    const task = taskById.get(item.id);
+    if (!task || !shouldSurfaceOverdueOnToday(task, todayIso)) return true;
+    if (!todayKeys.has(item.key)) {
+      overduePromoted.push(item);
+      todayKeys.add(item.key);
+    }
+    return false;
+  });
+  today.push(...overduePromoted);
+
+  if (!userOrderedToday) {
+    today.splice(0, today.length, ...sortTodayBoardItems(today, pillarRankById));
+  }
+
+  return { today, coming_up: sortComingUpByDate(comingUpFiltered) };
 }
 
-export function boardToLayout(today: BoardItem[], coming_up: BoardItem[]): MissionLayout {
+export function boardToLayout(
+  today: BoardItem[],
+  coming_up: BoardItem[],
+  options?: { today_user_ordered?: boolean }
+): MissionLayout {
   return {
     today: today.map((i) => ({ kind: i.kind, id: i.id, pinned: true })),
     coming_up: coming_up.map((i) => ({ kind: i.kind, id: i.id })),
+    ...(options?.today_user_ordered ? { today_user_ordered: true } : {}),
   };
 }

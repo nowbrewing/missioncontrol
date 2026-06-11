@@ -1,11 +1,14 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { useChat } from "@ai-sdk/react";
-import { DefaultChatTransport, isTextUIPart, type UIMessage } from "ai";
+import { useCallback, useEffect, useRef, useState } from "react";
 import MissionAddTask from "./MissionAddTask";
 import MissionBrief from "./MissionBrief";
 import MissionCheckIn from "./MissionCheckIn";
+import MissionLifeAdminStats from "./MissionLifeAdminStats";
+import type { LifeAdminStats } from "../lib/life-admin";
+import ProposedTasksReviewModal, {
+  type ProposedTaskDraft,
+} from "./ProposedTasksReviewModal";
 import type { MissionReflectionDisplay } from "../lib/mission-reflection-display";
 import MissionWeeklyChecklist from "./MissionWeeklyChecklist";
 import type { RecurringWeekItem } from "../lib/recurring-events";
@@ -17,6 +20,12 @@ import { scheduleTypeFromMode } from "./TaskScheduleSelect";
 import type { TaskScheduleMode } from "./TaskScheduleSelect";
 import { resolvePillarAbbreviation } from "../lib/pillar-abbreviation";
 import type { ComingUpItem, MissionMilestone, MissionTask } from "../lib/mission-prioritize";
+
+type ChatMessage = {
+  id: string;
+  role: "user" | "assistant";
+  content: string;
+};
 
 type BriefData = {
   today: string;
@@ -35,6 +44,7 @@ type BriefData = {
   board_today: BoardItem[];
   board_coming_up: BoardItem[];
   reflection: MissionReflectionDisplay | null;
+  life_admin?: LifeAdminStats | null;
 };
 
 export default function MissionControl() {
@@ -45,19 +55,16 @@ export default function MissionControl() {
   const [loadingBrief, setLoadingBrief] = useState(true);
   const [chatInput, setChatInput] = useState("");
   const [showChat, setShowChat] = useState(false);
+  const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
+  const [chatBusy, setChatBusy] = useState(false);
+  const [chatError, setChatError] = useState<string | null>(null);
   const [recurringItems, setRecurringItems] = useState<RecurringWeekItem[]>([]);
   const [recurringWeekMonday, setRecurringWeekMonday] = useState("");
   const [loadingRecurring, setLoadingRecurring] = useState(true);
+  const [proposedTasks, setProposedTasks] = useState<ProposedTaskDraft[]>([]);
+  const [proposedReviewOpen, setProposedReviewOpen] = useState(false);
+  const [savingProposed, setSavingProposed] = useState(false);
   const todayAnchorRef = useRef<HTMLDivElement | null>(null);
-
-  const transport = useMemo(
-    () => new DefaultChatTransport<UIMessage>({ api: "/api/mission/chat" }),
-    []
-  );
-  const { messages, sendMessage, status, error: chatError } = useChat<UIMessage>({
-    transport,
-  });
-  const isChatBusy = status === "submitted" || status === "streaming";
 
   const loadRecurringWeek = useCallback(async () => {
     const res = await fetch("/api/recurring-events/week");
@@ -84,6 +91,7 @@ export default function MissionControl() {
         board_today: data.board_today ?? [],
         board_coming_up: data.board_coming_up ?? [],
         reflection: data.reflection ?? null,
+        life_admin: data.life_admin ?? null,
       });
     }
     setLoadingBrief(false);
@@ -98,7 +106,7 @@ export default function MissionControl() {
     loadBrief(planDate);
   }, [planDate, loadBrief]);
 
-  function handleCheckInProcessed({ brief: raw }: { brief: Record<string, unknown> }) {
+  function applyBrief(raw: Record<string, unknown>) {
     const nextBrief = raw as unknown as BriefData;
     setBrief({
       today: nextBrief.today,
@@ -111,12 +119,86 @@ export default function MissionControl() {
       board_today: nextBrief.board_today ?? [],
       board_coming_up: nextBrief.board_coming_up ?? [],
       reflection: nextBrief.reflection ?? null,
+      life_admin: nextBrief.life_admin ?? null,
     });
+  }
+
+  function openProposedTaskReview(drafts: ProposedTaskDraft[]) {
+    if (drafts.length === 0) return;
+    setProposedTasks(drafts);
+    setProposedReviewOpen(true);
+  }
+
+  function handleCheckInProcessed(data: {
+    brief: Record<string, unknown>;
+    proposed_tasks?: {
+      title: string;
+      pillar: string;
+      pillar_id: number | null;
+      deadline: string | null;
+      bucket: "Today" | "This Week" | "Later";
+    }[];
+  }) {
+    applyBrief(data.brief);
     setThisWeekExpanded(false);
     setScrollToBoard(true);
     loadRecurringWeek().catch(() => {
       // Dev HMR can corrupt .next chunks; checklist refresh is non-critical here.
     });
+
+    const taskDrafts: ProposedTaskDraft[] = (data.proposed_tasks ?? []).map(
+      (task, i) => ({
+        localId: `proposed-${i}-${task.title}`,
+        title: task.title,
+        pillar: task.pillar,
+        pillar_id: task.pillar_id,
+        deadline: task.deadline,
+        bucket: task.bucket,
+      })
+    );
+
+    openProposedTaskReview(taskDrafts);
+  }
+
+  async function confirmProposedTasks(tasks: ProposedTaskDraft[]) {
+    if (tasks.length === 0) {
+      setProposedReviewOpen(false);
+      setProposedTasks([]);
+      return;
+    }
+
+    setSavingProposed(true);
+    try {
+      const res = await fetch("/api/mission/proposed-tasks", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          plan_date: planDate,
+          tasks: tasks.map((t) => ({
+            title: t.title.trim(),
+            pillar_id: t.pillar_id,
+            deadline: t.deadline,
+            bucket: t.bucket,
+          })),
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.ok) {
+        throw new Error(data.error || "Failed to save tasks");
+      }
+      if (data.brief) applyBrief(data.brief);
+      setProposedReviewOpen(false);
+      setProposedTasks([]);
+      setScrollToBoard(true);
+    } finally {
+      setSavingProposed(false);
+    }
+  }
+
+  function dismissProposedReview() {
+    if (savingProposed) return;
+    setProposedReviewOpen(false);
+    setProposedTasks([]);
   }
 
   useEffect(() => {
@@ -213,6 +295,23 @@ export default function MissionControl() {
     await patchTask(id, { deadline });
   }
 
+  async function toggleTaskDateLock(
+    id: number,
+    locked: boolean,
+    deadline: string | null
+  ) {
+    if (locked && !deadline) return;
+    const patch = {
+      date_locked: locked,
+      ...(locked ? { schedule_type: "fixed" as const } : {}),
+    };
+    setBrief((prev) => (prev ? patchTaskInBrief(prev, id, patch) : prev));
+    await patchTask(id, {
+      date_locked: locked,
+      ...(locked ? { schedule_type: "fixed" } : {}),
+    });
+  }
+
   async function patchTask(id: number, body: Record<string, unknown>) {
     const res = await fetch(`/api/tasks/${id}`, {
       method: "PATCH",
@@ -266,10 +365,48 @@ export default function MissionControl() {
   async function onChatSubmit(e: React.FormEvent) {
     e.preventDefault();
     const text = chatInput.trim();
-    if (!text || isChatBusy) return;
+    if (!text || chatBusy) return;
+
+    const userMessage: ChatMessage = {
+      id: `user-${Date.now()}`,
+      role: "user",
+      content: text,
+    };
+    const nextHistory = [...chatMessages, userMessage];
+    setChatMessages(nextHistory);
     setChatInput("");
-    await sendMessage({ text });
-    await loadBrief(planDate);
+    setChatBusy(true);
+    setChatError(null);
+
+    try {
+      const res = await fetch("/api/mission/chat", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          message: text,
+          plan_date: planDate,
+          history: chatMessages.map((m) => ({ role: m.role, content: m.content })),
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.ok) {
+        throw new Error(data.error || "Chat failed");
+      }
+
+      setChatMessages((prev) => [
+        ...prev,
+        {
+          id: `assistant-${Date.now()}`,
+          role: "assistant",
+          content: String(data.reply),
+        },
+      ]);
+      await loadBrief(planDate);
+    } catch (err) {
+      setChatError(err instanceof Error ? err.message : "Chat failed");
+    } finally {
+      setChatBusy(false);
+    }
   }
 
   if (loadingBrief && !brief) {
@@ -287,14 +424,26 @@ export default function MissionControl() {
         onProcessed={handleCheckInProcessed}
       />
 
+      {proposedReviewOpen && brief && (
+        <ProposedTasksReviewModal
+          key={proposedTasks.map((t) => t.localId).join("|")}
+          tasks={proposedTasks}
+          pillars={brief.pillars}
+          planDate={planDate}
+          saving={savingProposed}
+          onConfirm={confirmProposedTasks}
+          onDismiss={dismissProposedReview}
+        />
+      )}
+
       {brief && (
         <div className="missionBoardAndChecklist">
           <div className="missionBoardMain">
             <div ref={todayAnchorRef} />
 
             <MissionBrief
-              today={brief.today}
-              calendarToday={brief.calendar_today ?? planDate}
+              today={planDate}
+              calendarToday={brief.calendar_today ?? todayIsoYyyyMmDd()}
               boardToday={brief.board_today}
               boardComingUp={brief.board_coming_up}
               pillars={brief.pillars}
@@ -314,6 +463,7 @@ export default function MissionControl() {
               onScheduleChange={updateTaskSchedule}
               onTitleChange={updateTaskTitle}
               onDeleteTask={deleteTask}
+              onDateLockChange={toggleTaskDateLock}
               onLayoutChange={(today, comingUp) =>
                 setBrief((prev) =>
                   prev
@@ -336,8 +486,8 @@ export default function MissionControl() {
                     </button>
                   </div>
                   <MissionBrief
-                    today={brief.today}
-                    calendarToday={brief.calendar_today ?? planDate}
+                    today={planDate}
+                    calendarToday={brief.calendar_today ?? todayIsoYyyyMmDd()}
                     boardToday={brief.board_today}
                     boardComingUp={brief.board_coming_up}
                     pillars={brief.pillars}
@@ -350,6 +500,7 @@ export default function MissionControl() {
                     onScheduleChange={updateTaskSchedule}
                     onTitleChange={updateTaskTitle}
                     onDeleteTask={deleteTask}
+                    onDateLockChange={toggleTaskDateLock}
                     onLayoutChange={(today, comingUp) =>
                       setBrief((prev) =>
                         prev
@@ -383,6 +534,7 @@ export default function MissionControl() {
               loading={loadingRecurring}
               onProgressChange={updateRecurringProgress}
             />
+            <MissionLifeAdminStats stats={brief.life_admin ?? null} />
           </aside>
         </div>
       )}
@@ -393,34 +545,29 @@ export default function MissionControl() {
           className="missionChatToggle outlineButton"
           onClick={() => setShowChat((v) => !v)}
         >
-          {showChat ? "Hide follow-up chat" : "Ask a follow-up"}
+          {showChat ? "Hide follow-up chat" : "Confirm or refine with Life Agent"}
         </button>
 
         {showChat && (
           <>
             <p className="sectionHint">
-              Ask for help reprioritizing, adjusting focus, or understanding deadlines.
+              Optional: confirm the day plan or ask the Life Agent to adjust priorities.
             </p>
             <div className="chatMessages" aria-live="polite">
-              {messages.length === 0 && (
+              {chatMessages.length === 0 && (
                 <div className="chatEmpty card">
-                  e.g. &quot;What should I tackle first?&quot; or &quot;What can wait until
-                  next week?&quot;
+                  e.g. &quot;Looks good — save it&quot; or &quot;Move the dentist task to
+                  later this week&quot;
                 </div>
               )}
-              {messages.map((message) => {
-                if (message.role === "system") return null;
+              {chatMessages.map((message) => {
                 const isUser = message.role === "user";
-                const text = message.parts
-                  .filter(isTextUIPart)
-                  .map((p) => p.text)
-                  .join("");
                 return (
                   <div
                     key={message.id}
                     className={`chatBubble ${isUser ? "chatBubbleUser" : "chatBubbleAssistant"}`}
                   >
-                    <p className="chatTextPart">{text}</p>
+                    <p className="chatTextPart">{message.content}</p>
                   </div>
                 );
               })}
@@ -428,7 +575,7 @@ export default function MissionControl() {
             {chatError && (
               <div className="chatErrorBox">
                 <strong>Assistant error</strong>
-                <p className="chatError">{chatError.message}</p>
+                <p className="chatError">{chatError}</p>
               </div>
             )}
             <form className="chatForm" onSubmit={onChatSubmit}>
@@ -437,15 +584,15 @@ export default function MissionControl() {
                 rows={2}
                 value={chatInput}
                 onChange={(e) => setChatInput(e.target.value)}
-                placeholder="Ask about priorities or what to tackle next..."
-                disabled={isChatBusy}
+                placeholder="Confirm the plan or ask for changes..."
+                disabled={chatBusy}
               />
               <button
                 className="chatSendBtn"
                 type="submit"
-                disabled={isChatBusy || !chatInput.trim()}
+                disabled={chatBusy || !chatInput.trim()}
               >
-                {isChatBusy ? "..." : "Ask"}
+                {chatBusy ? "..." : "Send"}
               </button>
             </form>
           </>

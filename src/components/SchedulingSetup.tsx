@@ -36,7 +36,7 @@ export default function SchedulingSetup() {
   }, [load]);
 
   if (loading) {
-    return <p className="sectionHint">Loading scheduling...</p>;
+    return <p className="sectionHint">Loading routines...</p>;
   }
 
   return <RecurringEventsSetup pillars={pillars} milestones={milestones} />;

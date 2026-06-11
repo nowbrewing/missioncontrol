@@ -24,6 +24,7 @@ import { CSS } from "@dnd-kit/utilities";
 import { useCallback, useEffect, useState, type ReactNode } from "react";
 import PillarChip from "./PillarChip";
 import TaskCardMeta from "./TaskCardMeta";
+import TaskDateLockToggle from "./TaskDateLockToggle";
 import TaskDeadlineEditor from "./TaskDeadlineEditor";
 import TaskTitleEditor from "./TaskTitleEditor";
 import { formatRelativeDateLabel } from "../lib/mission-dates";
@@ -93,8 +94,10 @@ function SortableBoardRow({
   onScheduleChange,
   onTitleChange,
   onDeleteTask,
+  onDateLockChange,
   onDemoteToWeek,
   onDemoteToFuture,
+  onPromoteToToday,
 }: {
   item: BoardItem;
   today: string;
@@ -108,8 +111,10 @@ function SortableBoardRow({
   onScheduleChange: (id: number, mode: TaskScheduleMode) => void;
   onTitleChange: (id: number, title: string) => void | Promise<void>;
   onDeleteTask: (id: number) => void;
+  onDateLockChange?: (id: number, locked: boolean, deadline: string | null) => void;
   onDemoteToWeek?: (item: BoardItem) => void;
   onDemoteToFuture?: (item: BoardItem) => void;
+  onPromoteToToday?: (item: BoardItem) => void;
 }) {
   const {
     attributes,
@@ -173,11 +178,36 @@ function SortableBoardRow({
                 className="boardItemTitle taskCardTitle"
                 onChange={(title) => onTitleChange(item.id, title)}
               />
-              <TaskDeadlineEditor
-                deadline={item.date}
-                overdue={overdue}
-                onChange={(deadline) => onDeadlineChange(item.id, deadline)}
-              />
+              <div className="taskDeadlineGroup">
+                <TaskDeadlineEditor
+                  deadline={item.date}
+                  overdue={overdue}
+                  onChange={(deadline) => onDeadlineChange(item.id, deadline)}
+                />
+                {onDateLockChange ? (
+                  <TaskDateLockToggle
+                    locked={!!item.date_locked}
+                    disabled={!item.date && !item.date_locked}
+                    onClick={() =>
+                      onDateLockChange(item.id, !item.date_locked, item.date)
+                    }
+                    title={
+                      item.date_locked
+                        ? `Must be done on ${item.date} only — click to unlock`
+                        : item.date
+                          ? `Lock to ${item.date} — cannot schedule on other days`
+                          : "Set a deadline first"
+                    }
+                    ariaLabel={
+                      item.date_locked
+                        ? `Locked to ${item.date ?? "deadline"} — unlock`
+                        : item.date
+                          ? `Lock task to ${item.date}`
+                          : "Lock task to date — set a deadline first"
+                    }
+                  />
+                ) : null}
+              </div>
             </div>
             <div className="taskCardRowBottom">
               <TaskCardMeta
@@ -187,11 +217,22 @@ function SortableBoardRow({
                 milestoneId={item.milestone_id ?? null}
                 scheduleType={item.schedule_type}
                 compact
+                leading={item.is_new ? <span className="pill pillNew">New</span> : null}
                 onPillarChange={(pillarId) => onPillarChange(item.id, pillarId)}
                 onMilestoneChange={(milestoneId) => onMilestoneChange(item.id, milestoneId)}
                 onScheduleChange={(mode) => onScheduleChange(item.id, mode)}
               />
               <div className="taskCardActions">
+                {listId === COMING_UP_LIST && onPromoteToToday ? (
+                  <button
+                    type="button"
+                    className="outlineButton btnCompact boardPromoteBtn"
+                    onClick={() => onPromoteToToday(item)}
+                    title="Move to Today's priorities"
+                  >
+                    ↑ Today
+                  </button>
+                ) : null}
                 {listId === TODAY_LIST && onDemoteToWeek ? (
                   <button
                     type="button"
@@ -250,6 +291,18 @@ function SortableBoardRow({
                   <span className="pill pillSubtle">{item.milestone_title}</span>
                 )}
               </div>
+              {listId === COMING_UP_LIST && onPromoteToToday ? (
+                <div className="taskCardActions">
+                  <button
+                    type="button"
+                    className="outlineButton btnCompact boardPromoteBtn"
+                    onClick={() => onPromoteToToday(item)}
+                    title="Move to Today's priorities"
+                  >
+                    ↑ Today
+                  </button>
+                </div>
+              ) : null}
             </div>
           </>
         )}
@@ -271,8 +324,10 @@ function BoardList({
   onScheduleChange,
   onTitleChange,
   onDeleteTask,
+  onDateLockChange,
   onDemoteToWeek,
   onDemoteToFuture,
+  onPromoteToToday,
   emptyMessage,
   greatJob,
 }: {
@@ -288,8 +343,10 @@ function BoardList({
   onScheduleChange: (id: number, mode: TaskScheduleMode) => void;
   onTitleChange: (id: number, title: string) => void | Promise<void>;
   onDeleteTask: (id: number) => void;
+  onDateLockChange?: (id: number, locked: boolean, deadline: string | null) => void;
   onDemoteToWeek?: (item: BoardItem) => void;
   onDemoteToFuture?: (item: BoardItem) => void;
+  onPromoteToToday?: (item: BoardItem) => void;
   emptyMessage: string;
   greatJob?: string | null;
 }) {
@@ -323,8 +380,10 @@ function BoardList({
               onScheduleChange={onScheduleChange}
               onTitleChange={onTitleChange}
               onDeleteTask={onDeleteTask}
+              onDateLockChange={onDateLockChange}
               onDemoteToWeek={id === TODAY_LIST ? onDemoteToWeek : undefined}
               onDemoteToFuture={onDemoteToFuture}
+              onPromoteToToday={id === COMING_UP_LIST ? onPromoteToToday : undefined}
             />
           ))
         )}
@@ -350,6 +409,7 @@ export default function MissionBrief({
   onScheduleChange,
   onTitleChange,
   onDeleteTask,
+  onDateLockChange,
   onLayoutChange,
 }: {
   today: string;
@@ -368,6 +428,7 @@ export default function MissionBrief({
   onScheduleChange: (id: number, mode: TaskScheduleMode) => void;
   onTitleChange: (id: number, title: string) => void | Promise<void>;
   onDeleteTask: (id: number) => void;
+  onDateLockChange?: (id: number, locked: boolean, deadline: string | null) => void;
   onLayoutChange: (today: BoardItem[], comingUp: BoardItem[]) => void;
 }) {
   const [todayItems, setTodayItems] = useState(boardToday);
@@ -388,7 +449,11 @@ export default function MissionBrief({
   const calendarDay = calendarToday ?? today;
 
   const persistLayout = useCallback(
-    async (nextToday: BoardItem[], nextComingUp: BoardItem[]) => {
+    async (
+      nextToday: BoardItem[],
+      nextComingUp: BoardItem[],
+      options?: { todayUserOrdered?: boolean }
+    ) => {
       const sortedComingUp = sortComingUpByDate(nextComingUp);
       await fetch("/api/mission/layout", {
         method: "POST",
@@ -397,6 +462,7 @@ export default function MissionBrief({
           today: nextToday,
           coming_up: sortedComingUp,
           layout_date: today,
+          ...(options?.todayUserOrdered ? { today_user_ordered: true } : {}),
         }),
       });
       onLayoutChange(nextToday, sortedComingUp);
@@ -432,7 +498,7 @@ export default function MissionBrief({
 
       const reordered = arrayMove(items, oldIndex, newIndex);
       setTodayItems(reordered);
-      persistLayout(reordered, comingUpItems);
+      persistLayout(reordered, comingUpItems, { todayUserOrdered: true });
       return;
     }
 
@@ -442,6 +508,16 @@ export default function MissionBrief({
       activeContainer === TODAY_LIST ? comingUpItems : todayItems;
     const item = source.find((i) => i.key === activeKey);
     if (!item) return;
+
+    if (
+      item.kind === "task" &&
+      item.date_locked &&
+      item.date === today &&
+      activeContainer === TODAY_LIST &&
+      overContainer === COMING_UP_LIST
+    ) {
+      return;
+    }
 
     const nextSource = source.filter((i) => i.key !== activeKey);
     let insertIndex =
@@ -466,7 +542,7 @@ export default function MissionBrief({
     } else {
       setTodayItems(nextDest);
       setComingUpItems(nextSource);
-      persistLayout(nextDest, nextSource);
+      persistLayout(nextDest, nextSource, { todayUserOrdered: true });
     }
   }
 
@@ -476,6 +552,12 @@ export default function MissionBrief({
 
   const demoteToWeek = useCallback(
     (item: BoardItem) => {
+      if (item.date_locked && item.date === today) {
+        window.alert(
+          `“${item.title}” is locked to today (${item.date}) and cannot be demoted.`
+        );
+        return;
+      }
       const nextToday = todayItems.filter((i) => i.key !== item.key);
       const nextComingUp = sortComingUpByDate([
         ...comingUpItems.filter((i) => i.key !== item.key),
@@ -485,7 +567,24 @@ export default function MissionBrief({
       setComingUpItems(nextComingUp);
       persistLayout(nextToday, nextComingUp);
     },
-    [todayItems, comingUpItems, persistLayout]
+    [todayItems, comingUpItems, persistLayout, today]
+  );
+
+  const promoteToToday = useCallback(
+    (item: BoardItem) => {
+      if (item.date_locked && item.date && item.date !== today) {
+        window.alert(
+          `“${item.title}” is locked to ${item.date} and cannot be moved to today.`
+        );
+        return;
+      }
+      const nextComingUp = comingUpItems.filter((i) => i.key !== item.key);
+      const nextToday = [...todayItems.filter((i) => i.key !== item.key), item];
+      setTodayItems(nextToday);
+      setComingUpItems(nextComingUp);
+      persistLayout(nextToday, nextComingUp);
+    },
+    [todayItems, comingUpItems, persistLayout, today]
   );
 
   const demoteToFuture = useCallback(
@@ -520,7 +619,7 @@ export default function MissionBrief({
               {headerAction}
             </div>
             <p className="sectionHint">
-              Drag ⠿ to reorder, use ↓ Week / ↓ Later to demote, or move items to This Week.
+              Drag ⠿ to reorder, use ↓ Week / ↓ Later to demote, or drag items to This Week.
             </p>
             <BoardList
               id={TODAY_LIST}
@@ -535,10 +634,11 @@ export default function MissionBrief({
               onScheduleChange={onScheduleChange}
               onTitleChange={onTitleChange}
               onDeleteTask={onDeleteTask}
+              onDateLockChange={onDateLockChange}
               onDemoteToWeek={demoteToWeek}
               onDemoteToFuture={demoteToFuture}
               greatJob={greatJobMessage(todayItems, "today", today, calendarDay)}
-              emptyMessage="Drag tasks here or process your morning check-in above."
+              emptyMessage="Drag tasks here or use Check In above."
             />
           </section>
         )}
@@ -547,7 +647,7 @@ export default function MissionBrief({
           <section className="section">
             <h2 className="sectionTitle">This Week</h2>
             <p className="sectionHint">
-              Deadlines and milestones this week — drag into Today&apos;s priorities when ready.
+              Deadlines and milestones this week — use ↑ Today to promote or drag within the list.
             </p>
             <BoardList
               id={COMING_UP_LIST}
@@ -562,7 +662,9 @@ export default function MissionBrief({
               onScheduleChange={onScheduleChange}
               onTitleChange={onTitleChange}
               onDeleteTask={onDeleteTask}
+              onDateLockChange={onDateLockChange}
               onDemoteToFuture={demoteToFuture}
+              onPromoteToToday={promoteToToday}
               greatJob={greatJobMessage(comingUpItems, "week", today, calendarDay)}
               emptyMessage="Nothing scheduled for this week yet."
             />

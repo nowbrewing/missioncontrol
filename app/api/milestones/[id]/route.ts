@@ -1,8 +1,10 @@
 import { NextResponse } from "next/server";
-import { ensureLifeSchema } from "../../../../src/db/life";
 import { requireSessionUser } from "../../../../src/lib/auth";
 import { isYyyyMmDd } from "../../../../src/lib/date";
-import { requireTursoClient } from "../../../../src/lib/turso";
+import {
+  deleteMilestone,
+  updateMilestone,
+} from "../../../../src/lib/mongodb/store/milestones";
 
 type Params = { params: Promise<{ id: string }> };
 
@@ -24,33 +26,30 @@ export const PATCH = async (req: Request, { params }: Params) => {
       return NextResponse.json({ ok: false, error: "Invalid target_date" }, { status: 400 });
     }
 
-    const turso = requireTursoClient();
-    await ensureLifeSchema(turso);
-
-    const sets: string[] = [];
-    const args: (string | number | null)[] = [];
+    const patch: {
+      title?: string;
+      targetDate?: string | null;
+      completedAt?: string | null;
+    } = {};
 
     if (body.title !== undefined) {
-      sets.push("title = ?");
-      args.push(body.title.trim() || null);
+      const title = body.title.trim();
+      if (!title) {
+        return NextResponse.json({ ok: false, error: "Title is required" }, { status: 400 });
+      }
+      patch.title = title;
     }
     if (body.target_date !== undefined) {
-      sets.push("target_date = ?");
-      args.push(body.target_date);
+      patch.targetDate = body.target_date;
     }
     if (body.completed !== undefined) {
-      sets.push("completed_at = ?");
-      args.push(body.completed ? new Date().toISOString() : null);
+      patch.completedAt = body.completed ? new Date().toISOString() : null;
     }
-    if (sets.length === 0) {
+    if (Object.keys(patch).length === 0) {
       return NextResponse.json({ ok: false, error: "Nothing to update" }, { status: 400 });
     }
 
-    args.push(milestoneId, user.id);
-    await turso.execute({
-      sql: `UPDATE milestones SET ${sets.join(", ")} WHERE id = ? AND user_id = ?;`,
-      args,
-    });
+    await updateMilestone(user.id, milestoneId, patch);
 
     return NextResponse.json({ ok: true });
   } catch (e: unknown) {
@@ -69,13 +68,7 @@ export const DELETE = async (_req: Request, { params }: Params) => {
       return NextResponse.json({ ok: false, error: "Invalid id" }, { status: 400 });
     }
 
-    const turso = requireTursoClient();
-    await ensureLifeSchema(turso);
-
-    await turso.execute({
-      sql: `DELETE FROM milestones WHERE id = ? AND user_id = ?;`,
-      args: [milestoneId, user.id],
-    });
+    await deleteMilestone(user.id, milestoneId);
 
     return NextResponse.json({ ok: true });
   } catch (e: unknown) {

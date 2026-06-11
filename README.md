@@ -2,7 +2,7 @@
 
 Personal life planning and daily mission control — pillars, tasks, scheduling, daily logs, and AI-assisted prioritization.
 
-Built with Next.js 15, Turso (libSQL), and Vercel AI SDK.
+Built with Next.js 15, MongoDB Atlas, and Vercel AI SDK.
 
 ## Setup
 
@@ -10,7 +10,7 @@ Built with Next.js 15, Turso (libSQL), and Vercel AI SDK.
 cd "/Users/yuanichen/Desktop/mission control"
 npm install
 cp .env.example .env.local
-# Fill in ODB_TURSO_DATABASE_URL and ODB_TURSO_AUTH_TOKEN (same Turso DB as before)
+# Fill in MONGODB_URI and MONGODB_DB_NAME
 npm run dev
 ```
 
@@ -18,7 +18,7 @@ Open http://localhost:3000
 
 ### First-time database setup
 
-If the Turso database is new or missing life-planning tables:
+Initialize MongoDB indexes:
 
 ```bash
 curl -X POST http://localhost:3000/api/admin/init \
@@ -26,6 +26,14 @@ curl -X POST http://localhost:3000/api/admin/init \
 ```
 
 Omit the header if `ADMIN_INIT_TOKEN` is not set (local dev only).
+
+### Migrating from Turso (one-time)
+
+If you have existing data in Turso, add `ODB_TURSO_*` vars to `.env.local` and run:
+
+```bash
+npm run sync:mongo
+```
 
 ## Deploy on Vercel
 

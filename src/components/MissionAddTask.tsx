@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { selectablePillars } from "../lib/life-admin";
 
 type Pillar = {
   id: number;
@@ -106,8 +107,8 @@ export default function MissionAddTask({
                   onChange={(e) => setPillarId(e.target.value)}
                   disabled={saving}
                 >
-                  <option value="">No pillar</option>
-                  {pillars.map((p) => (
+                  <option value="">Life Admin</option>
+                  {selectablePillars(pillars).map((p) => (
                     <option key={p.id} value={p.id}>
                       {p.name}
                     </option>

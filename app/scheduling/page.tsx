@@ -6,10 +6,10 @@ export default function SchedulingPage() {
     <>
       <TopNav />
       <main className="container">
-        <h1 className="title">Scheduling</h1>
+        <h1 className="title">Routines</h1>
         <p className="subtitle">
-          Set up habits and routines that reset every Monday. Track progress on the
-          Checklist tab in Mission Control.
+          Set up habits and routines that reset every Monday. Track progress on Mission
+          Control.
         </p>
         <SchedulingSetup />
       </main>

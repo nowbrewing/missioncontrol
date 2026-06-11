@@ -1,12 +1,14 @@
 import { NextResponse } from "next/server";
-import { ensureLifeSchema } from "../../../../src/db/life";
 import { requireSessionUser } from "../../../../src/lib/auth";
 import {
   DEFAULT_DAILY_DAYS,
-  serializeDailyDays,
+  normalizeRecurringKind,
   type RecurringKind,
 } from "../../../../src/lib/recurring-week";
-import { requireTursoClient } from "../../../../src/lib/turso";
+import {
+  deleteRoutine,
+  updateRoutine,
+} from "../../../../src/lib/mongodb/store/routines";
 
 type Params = { params: Promise<{ id: string }> };
 
@@ -33,84 +35,77 @@ export const PATCH = async (req: Request, { params }: Params) => {
       active?: boolean;
     };
 
-    const turso = requireTursoClient();
-    await ensureLifeSchema(turso);
-
-    const sets: string[] = [];
-    const args: (string | number | null)[] = [];
+    const patch: Partial<{
+      title: string;
+      kind: RecurringKind;
+      targetFrequency: number;
+      dailyDays: boolean[];
+      tallyEnabled: boolean;
+      pillarId: number | null;
+      milestoneId: number | null;
+      spawnTaskCards: boolean;
+      active: boolean;
+    }> = {};
+    let nextKind: RecurringKind | undefined;
+    let nextTallyEnabled: boolean | undefined;
 
     if (body.title !== undefined) {
       const title = body.title.trim();
       if (!title) {
         return NextResponse.json({ ok: false, error: "Title is required" }, { status: 400 });
       }
-      sets.push("title = ?");
-      args.push(title);
+      patch.title = title;
     }
     if (body.kind !== undefined && KINDS.includes(body.kind)) {
-      sets.push("kind = ?");
-      args.push(body.kind);
+      const normalized = normalizeRecurringKind(body.kind, body.tally_enabled ?? false);
+      nextKind = normalized.kind;
+      nextTallyEnabled = normalized.tally_enabled;
+      patch.kind = normalized.kind;
     }
     if (body.tally_enabled !== undefined) {
-      sets.push("tally_enabled = ?");
-      args.push(body.tally_enabled ? 1 : 0);
+      const normalized = normalizeRecurringKind(body.kind ?? "daily", body.tally_enabled);
+      nextKind = normalized.kind;
+      nextTallyEnabled = normalized.tally_enabled;
+      patch.tallyEnabled = normalized.tally_enabled;
     }
     if (body.target_count !== undefined) {
-      const resolvedKind = body.kind;
+      const resolvedKind = nextKind ?? body.kind;
+      const resolvedTallyEnabled = nextTallyEnabled ?? body.tally_enabled ?? false;
       let targetCount = Number(body.target_count);
       if (!Number.isFinite(targetCount)) targetCount = 0;
-      if (resolvedKind === "count") {
+      if (resolvedKind === "count" && !resolvedTallyEnabled) {
         if (targetCount < 1) targetCount = 1;
         if (targetCount > 50) targetCount = 50;
       } else {
         if (targetCount < 0) targetCount = 0;
         if (targetCount > 9999) targetCount = 9999;
       }
-      sets.push("target_count = ?");
-      args.push(targetCount);
+      patch.targetFrequency = targetCount;
     }
     if (body.daily_days !== undefined) {
-      const days =
+      patch.dailyDays =
         Array.isArray(body.daily_days) && body.daily_days.length === 7
-          ? serializeDailyDays(body.daily_days.map(Boolean) as [
-              boolean,
-              boolean,
-              boolean,
-              boolean,
-              boolean,
-              boolean,
-              boolean,
-            ])
-          : serializeDailyDays(DEFAULT_DAILY_DAYS);
-      sets.push("daily_days = ?");
-      args.push(days);
+          ? (body.daily_days.map(Boolean) as boolean[])
+          : DEFAULT_DAILY_DAYS;
     }
     if (body.pillar_id !== undefined) {
-      sets.push("pillar_id = ?");
-      args.push(body.pillar_id);
+      patch.pillarId = body.pillar_id;
     }
     if (body.milestone_id !== undefined) {
-      sets.push("milestone_id = ?");
-      args.push(body.milestone_id);
+      patch.milestoneId = body.milestone_id;
     }
     if (body.spawn_task_cards !== undefined) {
-      sets.push("spawn_task_cards = ?");
-      args.push(body.spawn_task_cards ? 1 : 0);
+      patch.spawnTaskCards = !!body.spawn_task_cards;
     }
     if (body.active !== undefined) {
-      sets.push("active = ?");
-      args.push(body.active ? 1 : 0);
+      patch.active = !!body.active;
     }
 
-    if (sets.length === 0) {
+    if (Object.keys(patch).length === 0) {
       return NextResponse.json({ ok: false, error: "Nothing to update" }, { status: 400 });
     }
 
-    args.push(eventId, user.id);
-    await turso.execute({
-      sql: `UPDATE recurring_events SET ${sets.join(", ")} WHERE id = ? AND user_id = ?;`,
-      args,
-    });
+    await updateRoutine(user.id, eventId, patch);
 
     return NextResponse.json({ ok: true });
   } catch (e: unknown) {
@@ -129,13 +124,7 @@ export const DELETE = async (_req: Request, { params }: Params) => {
       return NextResponse.json({ ok: false, error: "Invalid id" }, { status: 400 });
     }
 
-    const turso = requireTursoClient();
-    await ensureLifeSchema(turso);
-
-    await turso.execute({
-      sql: `DELETE FROM recurring_events WHERE id = ? AND user_id = ?;`,
-      args: [eventId, user.id],
-    });
+    await deleteRoutine(user.id, eventId);
 
     return NextResponse.json({ ok: true });
   } catch (e: unknown) {

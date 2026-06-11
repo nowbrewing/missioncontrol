@@ -1,8 +1,6 @@
 import { NextResponse } from "next/server";
-import { ensureLifeSchema } from "../../../../src/db/life";
 import { requireSessionUser } from "../../../../src/lib/auth";
 import { reorderItems } from "../../../../src/lib/reorder";
-import { requireTursoClient } from "../../../../src/lib/turso";
 
 export const POST = async (req: Request) => {
   try {
@@ -12,9 +10,7 @@ export const POST = async (req: Request) => {
       return NextResponse.json({ ok: false, error: "Invalid ids" }, { status: 400 });
     }
 
-    const turso = requireTursoClient();
-    await ensureLifeSchema(turso);
-    await reorderItems(turso, "milestones", user.id, body.ids);
+    await reorderItems("milestones", user.id, body.ids);
 
     return NextResponse.json({ ok: true });
   } catch (e: unknown) {

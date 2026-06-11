@@ -309,7 +309,7 @@ export default function MissionWeeklyChecklist({
         <div className="card recurringChecklistEmpty">
           <p style={{ margin: 0, opacity: 0.8 }}>
             No recurring items yet. Add habits and routines on the{" "}
-            <strong>Scheduling</strong> page in the nav bar.
+            <strong>Routines</strong> page in the nav bar.
           </p>
         </div>
       ) : (

@@ -1,7 +1,5 @@
 import { NextResponse } from "next/server";
-import { ensureLifeSchema } from "../../../../src/db/life";
-import { ensureUsersSchema } from "../../../../src/db/users";
-import { requireTursoClient } from "../../../../src/lib/turso";
+import { ensureMongoReady } from "../../../../src/lib/mongodb/init";
 
 function requireAdminToken(req: Request) {
   const expected = process.env.ADMIN_INIT_TOKEN;
@@ -13,15 +11,11 @@ function requireAdminToken(req: Request) {
 export const POST = async (req: Request) => {
   try {
     requireAdminToken(req);
-    const turso = requireTursoClient();
-
-    await ensureUsersSchema(turso);
-    await ensureLifeSchema(turso);
+    await ensureMongoReady();
 
     return NextResponse.json({
       ok: true,
-      users_ready: true,
-      life_app_ready: true,
+      mongodb_ready: true,
     });
   } catch (e: unknown) {
     const msg = e instanceof Error ? e.message : "Init failed";

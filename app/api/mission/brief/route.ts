@@ -2,7 +2,6 @@ import { NextResponse } from "next/server";
 import { requireSessionUser } from "../../../../src/lib/auth";
 import { isYyyyMmDd } from "../../../../src/lib/date";
 import { buildMissionBrief } from "../../../../src/lib/mission-brief";
-import { requireTursoClient } from "../../../../src/lib/turso";
 
 export async function GET(req: Request) {
   try {
@@ -11,8 +10,7 @@ export async function GET(req: Request) {
     const dateParam = url.searchParams.get("date");
     const focusDate = dateParam && isYyyyMmDd(dateParam) ? dateParam : undefined;
 
-    const turso = requireTursoClient();
-    const brief = await buildMissionBrief(turso, user.id, focusDate);
+    const brief = await buildMissionBrief(user.id, focusDate);
     return NextResponse.json({ ok: true, ...brief });
   } catch (e: unknown) {
     const msg = e instanceof Error ? e.message : "Failed to load brief";

@@ -1,25 +1,22 @@
 import { NextResponse } from "next/server";
-import { reflectAndPrioritize } from "../../../../src/lib/ai/mission-checkin-agent";
-import { extractTasksFromIntake, persistProcessedTasks } from "../../../../src/lib/ai/mission-process";
-import { applyPrioritization } from "../../../../src/lib/mission-apply-prioritization";
-import { assertChatProviderConfigured } from "../../../../src/lib/ai/provider";
+import { runMissionOrchestration } from "../../../../src/lib/adk/run-mission-orchestration";
+import { storeAgentReflection } from "../../../../src/lib/adk/store-agent-reflection";
 import { requireSessionUser } from "../../../../src/lib/auth";
-import {
-  addDaysIsoYyyyMmDd,
-  isYyyyMmDd,
-  todayIsoYyyyMmDd,
-} from "../../../../src/lib/date";
-import { buildMissionBrief } from "../../../../src/lib/mission-brief";
-import { ensureLifeSchema } from "../../../../src/db/life";
+import { isYyyyMmDd, todayIsoYyyyMmDd } from "../../../../src/lib/date";
 import { appendDailyLogEntry } from "../../../../src/lib/daily-log-entries";
-import { requireTursoClient } from "../../../../src/lib/turso";
+import { pillarIdsForLogText } from "../../../../src/lib/daily-log-pillar-tags";
+import { extractAndApplyPillarContextFromCheckIn } from "../../../../src/lib/apply-check-in-pillar-context";
+import { applyOrchestrationLayout } from "../../../../src/lib/mission-apply-orchestration-layout";
+import { buildMissionBrief } from "../../../../src/lib/mission-brief";
+import { listPillars } from "../../../../src/lib/mongodb/store/users";
+import { listTasks } from "../../../../src/lib/mongodb/store/tasks";
 
-export const maxDuration = 60;
+export const runtime = "nodejs";
+export const maxDuration = 120;
 
 export async function POST(req: Request) {
   try {
     const user = await requireSessionUser();
-    assertChatProviderConfigured();
 
     const body = (await req.json()) as {
       went_well_yesterday?: string;
@@ -37,67 +34,84 @@ export async function POST(req: Request) {
       );
     }
 
-    const turso = requireTursoClient();
-    await ensureLifeSchema(turso);
-
     const planDate =
       body.plan_date && isYyyyMmDd(body.plan_date)
         ? body.plan_date
         : todayIsoYyyyMmDd();
-    const dayBeforePlan = addDaysIsoYyyyMmDd(planDate, -1);
+    const pillars = await listPillars(user.id);
 
+    // Both entries anchor to the check-in / plan date — backward wins + forward brain dump.
     if (wentWell) {
-      await appendDailyLogEntry(turso, user.id, dayBeforePlan, "went_well", wentWell);
+      const pillarIds = await pillarIdsForLogText(wentWell, pillars);
+      await appendDailyLogEntry(user.id, planDate, "went_well", wentWell, pillarIds);
     }
 
     if (topOfMind) {
-      await appendDailyLogEntry(turso, user.id, planDate, "daily_focus", topOfMind);
+      const pillarIds = await pillarIdsForLogText(topOfMind, pillars);
+      await appendDailyLogEntry(user.id, planDate, "daily_focus", topOfMind, pillarIds);
     }
 
-    const extracted = await extractTasksFromIntake(
-      wentWell,
-      topOfMind,
-      user.id,
-      turso,
-      planDate
-    );
-    const intakeText = `${wentWell}\n${topOfMind}`;
-    const createdTasks =
-      extracted.tasks.length > 0
-        ? await persistProcessedTasks(
-            turso,
+    const pillarContextSaved =
+      topOfMind || wentWell
+        ? await extractAndApplyPillarContextFromCheckIn(
             user.id,
-            extracted.tasks,
-            intakeText,
-            planDate
+            planDate,
+            { brainDump: topOfMind || undefined, wins: wentWell || undefined },
+            pillars.map((p) => ({
+              id: Number(p.id),
+              name: String(p.name),
+              description: p.description ? String(p.description) : null,
+            }))
           )
         : [];
 
-    const prioritization = await reflectAndPrioritize(turso, user.id, planDate, {
-      went_well: wentWell,
-      top_of_mind: topOfMind,
-    });
-    await applyPrioritization(turso, user.id, planDate, prioritization);
+    if (!topOfMind) {
+      const brief = await buildMissionBrief(user.id, planDate);
+      return NextResponse.json({
+        ok: true,
+        summary: null,
+        proposed_tasks: [],
+        pillar_context_saved: pillarContextSaved,
+        brief,
+      });
+    }
 
-    const brief = await buildMissionBrief(turso, user.id, planDate);
+    const orchestration = await runMissionOrchestration({
+      userId: user.id,
+      planDate,
+      mode: "check_in",
+      brainDump: topOfMind,
+    });
+
+    const openTasks = (await listTasks(user.id)).filter((t) => !t.completed_at);
+    const taskRows = openTasks.map((t) => ({
+      id: Number(t.id),
+      deadline: t.deadline,
+      date_locked: Number(t.date_locked),
+    }));
+
+    await applyOrchestrationLayout(
+      user.id,
+      planDate,
+      orchestration.layout,
+      taskRows,
+      orchestration.reschedules
+    );
+
+    await storeAgentReflection(user.id, planDate, orchestration.dayGuide);
+
+    const briefAfterAgent = await buildMissionBrief(user.id, planDate);
 
     return NextResponse.json({
       ok: true,
-      created_tasks: createdTasks,
-      promoted_tasks: extracted.promote_to_today,
-      reflection: prioritization.reflection,
-      flags: prioritization.flags,
-      buckets: prioritization.buckets,
-      brief,
+      day_guide: orchestration.dayGuide,
+      proposed_tasks: orchestration.proposedTasks,
+      pillar_context_saved: pillarContextSaved,
+      brief: briefAfterAgent,
     });
   } catch (e: unknown) {
     const msg = e instanceof Error ? e.message : "Processing failed";
-    const status =
-      msg === "Unauthorized"
-        ? 401
-        : msg.includes("Missing") || msg.includes("not configured")
-          ? 500
-          : 500;
+    const status = msg === "Unauthorized" ? 401 : 500;
     console.error("[mission/process]", e);
     return NextResponse.json({ ok: false, error: msg }, { status });
   }

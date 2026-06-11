@@ -8,6 +8,7 @@ import TaskTitleEditor from "./TaskTitleEditor";
 import { scheduleTypeFromMode } from "./TaskScheduleSelect";
 import type { TaskScheduleMode } from "./TaskScheduleSelect";
 import { pillarColorVars } from "../lib/pillar-colors";
+import { taskBelongsToPillarGroup } from "../lib/life-admin";
 type Task = {
   id: number;
   title: string;
@@ -243,9 +244,8 @@ export default function TasksList({
     const grouped = pillars.map((pillar, idx) => ({
       pillar,
       rank: idx + 1,
-      tasks: visible.filter((t) => t.pillar_id === pillar.id),
+      tasks: visible.filter((t) => taskBelongsToPillarGroup(t, pillar)),
     }));
-    const unassigned = visible.filter((t) => !t.pillar_id || !pillarMap.has(t.pillar_id));
 
     return (
       <div className="sections">
@@ -280,13 +280,6 @@ export default function TasksList({
               <ul className="taskList">{pillarTasks.map(renderTask)}</ul>
             </section>
           ) : null
-        )}
-
-        {unassigned.length > 0 && (
-          <section className="section taskPillarGroup">
-            <h3 className="sectionTitle">Unassigned</h3>
-            <ul className="taskList">{unassigned.map(renderTask)}</ul>
-          </section>
         )}
 
         {visible.length === 0 && (

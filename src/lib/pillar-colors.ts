@@ -9,6 +9,7 @@ export const PILLAR_COLOR_OPTIONS = [
   { value: "#D946EF", name: "Radiant Fuchsia", label: "Personal Development" },
   { value: "#2563EB", name: "Cobalt Blue", label: "Wisdom & Communication" },
   { value: "#D87093", name: "Rich Terracotta", label: "Environment & Home" },
+  { value: "#000000", name: "Classic Black", label: "Neutral & Focus" },
 ] as const;
 
 export const DEFAULT_PILLAR_COLOR = PILLAR_COLOR_OPTIONS[0].value;
