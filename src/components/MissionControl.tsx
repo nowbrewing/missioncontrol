@@ -54,10 +54,12 @@ export default function MissionControl() {
   const [brief, setBrief] = useState<BriefData | null>(null);
   const [loadingBrief, setLoadingBrief] = useState(true);
   const [chatInput, setChatInput] = useState("");
-  const [showChat, setShowChat] = useState(false);
+  const [showChat, setShowChat] = useState(true);
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
   const [chatBusy, setChatBusy] = useState(false);
   const [chatError, setChatError] = useState<string | null>(null);
+  const [summarizingSession, setSummarizingSession] = useState(false);
+  const [sessionSaveNotice, setSessionSaveNotice] = useState<string | null>(null);
   const [recurringItems, setRecurringItems] = useState<RecurringWeekItem[]>([]);
   const [recurringWeekMonday, setRecurringWeekMonday] = useState("");
   const [loadingRecurring, setLoadingRecurring] = useState(true);
@@ -65,6 +67,15 @@ export default function MissionControl() {
   const [proposedReviewOpen, setProposedReviewOpen] = useState(false);
   const [savingProposed, setSavingProposed] = useState(false);
   const todayAnchorRef = useRef<HTMLDivElement | null>(null);
+  const chatMessagesRef = useRef(chatMessages);
+  const summarizedCountRef = useRef(0);
+  const chatBusyRef = useRef(chatBusy);
+  const planDateRef = useRef(planDate);
+  const finalizeInFlightRef = useRef(false);
+
+  chatMessagesRef.current = chatMessages;
+  chatBusyRef.current = chatBusy;
+  planDateRef.current = planDate;
 
   const loadRecurringWeek = useCallback(async () => {
     const res = await fetch("/api/recurring-events/week");
@@ -362,6 +373,74 @@ export default function MissionControl() {
     await loadBrief(planDate);
   }
 
+  async function finalizeChatSession(clearAfter = false) {
+    if (finalizeInFlightRef.current || chatBusyRef.current) return;
+
+    const all = chatMessagesRef.current;
+    const slice = all.slice(summarizedCountRef.current);
+    const hasUser = slice.some((m) => m.role === "user");
+    const hasExchange =
+      slice.some((m) => m.role === "assistant") && hasUser;
+    if (!hasExchange) return;
+
+    finalizeInFlightRef.current = true;
+    setSummarizingSession(true);
+
+    try {
+      const res = await fetch("/api/mission/chat/summarize", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          plan_date: planDateRef.current,
+          messages: slice.map((m) => ({ role: m.role, content: m.content })),
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.ok) return;
+
+      summarizedCountRef.current = all.length;
+      setSessionSaveNotice("Chat saved to daily log");
+      window.setTimeout(() => setSessionSaveNotice(null), 4500);
+
+      if (clearAfter) {
+        setChatMessages([]);
+        summarizedCountRef.current = 0;
+      }
+    } catch {
+      // non-blocking
+    } finally {
+      finalizeInFlightRef.current = false;
+      setSummarizingSession(false);
+    }
+  }
+
+  const finalizeChatSessionRef = useRef(finalizeChatSession);
+  finalizeChatSessionRef.current = finalizeChatSession;
+
+  useEffect(() => {
+    const onPageHide = () => {
+      void finalizeChatSessionRef.current(false);
+    };
+    const onVisibility = () => {
+      if (document.visibilityState === "hidden") {
+        void finalizeChatSessionRef.current(false);
+      }
+    };
+    window.addEventListener("pagehide", onPageHide);
+    document.addEventListener("visibilitychange", onVisibility);
+    return () => {
+      window.removeEventListener("pagehide", onPageHide);
+      document.removeEventListener("visibilitychange", onVisibility);
+    };
+  }, []);
+
+  function toggleChatPanel() {
+    if (showChat) {
+      void finalizeChatSession(true);
+    }
+    setShowChat((v) => !v);
+  }
+
   async function onChatSubmit(e: React.FormEvent) {
     e.preventDefault();
     const text = chatInput.trim();
@@ -372,9 +451,9 @@ export default function MissionControl() {
       role: "user",
       content: text,
     };
-    const nextHistory = [...chatMessages, userMessage];
-    setChatMessages(nextHistory);
+    setChatMessages((prev) => [...prev, userMessage]);
     setChatInput("");
+
     setChatBusy(true);
     setChatError(null);
 
@@ -401,7 +480,6 @@ export default function MissionControl() {
           content: String(data.reply),
         },
       ]);
-      await loadBrief(planDate);
     } catch (err) {
       setChatError(err instanceof Error ? err.message : "Chat failed");
     } finally {
@@ -423,6 +501,107 @@ export default function MissionControl() {
         onPlanDateChange={setPlanDate}
         onProcessed={handleCheckInProcessed}
       />
+
+      <section className="missionChatHero">
+        <header className="missionChatHeroHeader">
+          <button
+            type="button"
+            className="missionChatHeroTitleBtn"
+            onClick={toggleChatPanel}
+            aria-expanded={showChat}
+            disabled={summarizingSession}
+          >
+            <h2 className="missionChatHeroTitle">Chat with assistant</h2>
+          </button>
+          <div className="missionChatHeroHeaderActions">
+            {summarizingSession && (
+              <span className="missionChatSessionStatus">Saving to daily log…</span>
+            )}
+            {!summarizingSession && sessionSaveNotice && (
+              <span className="missionChatSessionStatus missionChatSessionSaved">
+                {sessionSaveNotice}
+              </span>
+            )}
+            <button
+              type="button"
+              className="missionChatHeroToggleBtn"
+              onClick={toggleChatPanel}
+              aria-expanded={showChat}
+              aria-label={showChat ? "Collapse chat" : "Expand chat"}
+              disabled={summarizingSession}
+            >
+              <span
+                className={`collapseChevron missionChatHeroChevron ${showChat ? "collapseChevronOpen" : ""}`}
+                aria-hidden
+              >
+                ▸
+              </span>
+            </button>
+          </div>
+        </header>
+
+        {showChat && (
+          <div className="missionChatHeroBody">
+            <p
+              className="missionChatHeroSubtext"
+              title="Open conversation — think out loud, reflect, or go deep on a pillar. When you collapse the chat, a summary is saved to your daily log with pillar tags for future context."
+            >
+              Think out loud or go deep on a pillar — collapse the chat when you&apos;re
+              done and a summary lands in your daily log.
+            </p>
+
+            <div className="chatMessages missionChatMessages" aria-live="polite">
+              {chatMessages.length === 0 && (
+                <p className="missionChatEmptyHint">
+                  e.g. &quot;I&apos;ve been spinning on the hackathon pitch — help me
+                  untangle what actually matters&quot;
+                </p>
+              )}
+              {chatMessages.map((message) => {
+                const isUser = message.role === "user";
+                return (
+                  <div
+                    key={message.id}
+                    className={`chatBubble ${isUser ? "chatBubbleUser" : "chatBubbleAssistant"}`}
+                  >
+                    <p className="chatTextPart">{message.content}</p>
+                  </div>
+                );
+              })}
+              {chatBusy && (
+                <div className="chatBubble chatBubbleAssistant">
+                  <p className="chatTextPart chatTextMuted">Thinking…</p>
+                </div>
+              )}
+            </div>
+
+            {chatError && (
+              <div className="chatErrorBox">
+                <strong>Assistant error</strong>
+                <p className="chatError">{chatError}</p>
+              </div>
+            )}
+
+            <form className="chatForm missionChatForm" onSubmit={onChatSubmit}>
+              <textarea
+                className="chatInput missionChatInput"
+                rows={3}
+                value={chatInput}
+                onChange={(e) => setChatInput(e.target.value)}
+                placeholder="What's on your mind?"
+                disabled={chatBusy || summarizingSession}
+              />
+              <button
+                className="chatSendBtn"
+                type="submit"
+                disabled={chatBusy || summarizingSession || !chatInput.trim()}
+              >
+                {chatBusy ? "..." : "Send"}
+              </button>
+            </form>
+          </div>
+        )}
+      </section>
 
       {proposedReviewOpen && brief && (
         <ProposedTasksReviewModal
@@ -538,66 +717,6 @@ export default function MissionControl() {
           </aside>
         </div>
       )}
-
-      <section className="section missionChat">
-        <button
-          type="button"
-          className="missionChatToggle outlineButton"
-          onClick={() => setShowChat((v) => !v)}
-        >
-          {showChat ? "Hide follow-up chat" : "Confirm or refine with Life Agent"}
-        </button>
-
-        {showChat && (
-          <>
-            <p className="sectionHint">
-              Optional: confirm the day plan or ask the Life Agent to adjust priorities.
-            </p>
-            <div className="chatMessages" aria-live="polite">
-              {chatMessages.length === 0 && (
-                <div className="chatEmpty card">
-                  e.g. &quot;Looks good — save it&quot; or &quot;Move the dentist task to
-                  later this week&quot;
-                </div>
-              )}
-              {chatMessages.map((message) => {
-                const isUser = message.role === "user";
-                return (
-                  <div
-                    key={message.id}
-                    className={`chatBubble ${isUser ? "chatBubbleUser" : "chatBubbleAssistant"}`}
-                  >
-                    <p className="chatTextPart">{message.content}</p>
-                  </div>
-                );
-              })}
-            </div>
-            {chatError && (
-              <div className="chatErrorBox">
-                <strong>Assistant error</strong>
-                <p className="chatError">{chatError}</p>
-              </div>
-            )}
-            <form className="chatForm" onSubmit={onChatSubmit}>
-              <textarea
-                className="chatInput"
-                rows={2}
-                value={chatInput}
-                onChange={(e) => setChatInput(e.target.value)}
-                placeholder="Confirm the plan or ask for changes..."
-                disabled={chatBusy}
-              />
-              <button
-                className="chatSendBtn"
-                type="submit"
-                disabled={chatBusy || !chatInput.trim()}
-              >
-                {chatBusy ? "..." : "Send"}
-              </button>
-            </form>
-          </>
-        )}
-      </section>
     </div>
   );
 }

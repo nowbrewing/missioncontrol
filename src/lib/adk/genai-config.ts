@@ -1,4 +1,5 @@
 import { GoogleGenAI } from "@google/genai";
+import { readFileSync } from "node:fs";
 
 export type GenAiBackend = "vertex" | "api_key";
 
@@ -34,13 +35,26 @@ function resolveApiKey(): string {
 }
 
 function googleAuthOptionsFromEnv() {
+  const credPath = process.env.GOOGLE_APPLICATION_CREDENTIALS?.trim();
+  if (credPath) {
+    try {
+      const raw = readFileSync(credPath, "utf8");
+      return { credentials: JSON.parse(raw) as object };
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : "invalid credentials file";
+      throw new Error(
+        `GOOGLE_APPLICATION_CREDENTIALS (${credPath}): ${msg}`
+      );
+    }
+  }
+
   const raw = process.env.GOOGLE_SERVICE_ACCOUNT_JSON?.trim();
   if (!raw) return undefined;
   try {
     return { credentials: JSON.parse(raw) as object };
   } catch {
     throw new Error(
-      "GOOGLE_SERVICE_ACCOUNT_JSON is set but is not valid JSON"
+      "GOOGLE_SERVICE_ACCOUNT_JSON is set but is not valid JSON — use a single-line minified JSON string in .env (multiline breaks dotenv)"
     );
   }
 }
@@ -139,7 +153,9 @@ export async function withRateLimitRetry<T>(
       lastError = e;
       if (!isRateLimitError(e) || attempt >= maxAttempts - 1) break;
       const delay = parseRetryDelayMs(e) ?? 8000 * (attempt + 1);
-      console.warn(`[genai] rate limited — retrying in ${delay}ms`);
+      console.warn(
+        `[genai] rate limited (${describeGenAiBackend()}) — retrying in ${delay}ms`
+      );
       await sleep(delay);
     }
   }

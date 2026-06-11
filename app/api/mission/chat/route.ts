@@ -1,8 +1,6 @@
 import { NextResponse } from "next/server";
-import {
-  runLifeAgent,
-  type LifeAgentMessage,
-} from "../../../../src/lib/adk/run-life-agent";
+import { runOpenChat } from "../../../../src/lib/adk/run-open-chat";
+import type { LifeAgentMessage } from "../../../../src/lib/adk/run-life-agent";
 import { requireSessionUser } from "../../../../src/lib/auth";
 import { isYyyyMmDd, todayIsoYyyyMmDd } from "../../../../src/lib/date";
 
@@ -36,7 +34,7 @@ export async function POST(req: Request) {
         m.content.trim()
     );
 
-    const reply = await runLifeAgent({
+    const reply = await runOpenChat({
       userId: user.id,
       planDate,
       message,

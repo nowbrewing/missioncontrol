@@ -41,31 +41,45 @@ export async function POST(req: Request) {
     const pillars = await listPillars(user.id);
 
     // Both entries anchor to the check-in / plan date — backward wins + forward brain dump.
+    const [wentWellPillarIds, topOfMindPillarIds] = await Promise.all([
+      wentWell ? pillarIdsForLogText(wentWell, pillars) : Promise.resolve([]),
+      topOfMind ? pillarIdsForLogText(topOfMind, pillars) : Promise.resolve([]),
+    ]);
+
     if (wentWell) {
-      const pillarIds = await pillarIdsForLogText(wentWell, pillars);
-      await appendDailyLogEntry(user.id, planDate, "went_well", wentWell, pillarIds);
+      await appendDailyLogEntry(
+        user.id,
+        planDate,
+        "went_well",
+        wentWell,
+        wentWellPillarIds
+      );
     }
 
     if (topOfMind) {
-      const pillarIds = await pillarIdsForLogText(topOfMind, pillars);
-      await appendDailyLogEntry(user.id, planDate, "daily_focus", topOfMind, pillarIds);
+      await appendDailyLogEntry(
+        user.id,
+        planDate,
+        "daily_focus",
+        topOfMind,
+        topOfMindPillarIds
+      );
     }
 
-    const pillarContextSaved =
-      topOfMind || wentWell
-        ? await extractAndApplyPillarContextFromCheckIn(
-            user.id,
-            planDate,
-            { brainDump: topOfMind || undefined, wins: wentWell || undefined },
-            pillars.map((p) => ({
-              id: Number(p.id),
-              name: String(p.name),
-              description: p.description ? String(p.description) : null,
-            }))
-          )
-        : [];
-
     if (!topOfMind) {
+      const pillarContextSaved =
+        wentWell || topOfMind
+          ? await extractAndApplyPillarContextFromCheckIn(
+              user.id,
+              planDate,
+              { brainDump: topOfMind || undefined, wins: wentWell || undefined },
+              pillars.map((p) => ({
+                id: Number(p.id),
+                name: String(p.name),
+                description: p.description ? String(p.description) : null,
+              }))
+            )
+          : [];
       const brief = await buildMissionBrief(user.id, planDate);
       return NextResponse.json({
         ok: true,
@@ -76,12 +90,26 @@ export async function POST(req: Request) {
       });
     }
 
-    const orchestration = await runMissionOrchestration({
-      userId: user.id,
+    const pillarContextPromise = extractAndApplyPillarContextFromCheckIn(
+      user.id,
       planDate,
-      mode: "check_in",
-      brainDump: topOfMind,
-    });
+      { brainDump: topOfMind, wins: wentWell || undefined },
+      pillars.map((p) => ({
+        id: Number(p.id),
+        name: String(p.name),
+        description: p.description ? String(p.description) : null,
+      }))
+    );
+
+    const [orchestration, pillarContextSaved] = await Promise.all([
+      runMissionOrchestration({
+        userId: user.id,
+        planDate,
+        mode: "check_in",
+        brainDump: topOfMind,
+      }),
+      pillarContextPromise,
+    ]);
 
     const openTasks = (await listTasks(user.id)).filter((t) => !t.completed_at);
     const taskRows = openTasks.map((t) => ({

@@ -12,7 +12,11 @@ import { listPillars } from "../../../../../src/lib/mongodb/store/users";
 
 type RouteContext = { params: Promise<{ id: string }> };
 
-const TAGGED_KINDS = new Set<DailyLogKind>(["went_well", "daily_focus"]);
+const TAGGED_KINDS = new Set<DailyLogKind>([
+  "went_well",
+  "daily_focus",
+  "assistant_chat",
+]);
 
 export async function PATCH(req: Request, context: RouteContext) {
   try {

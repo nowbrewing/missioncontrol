@@ -324,3 +324,19 @@ ${pillarRankList}
 PILLAR CONTEXT:
 ${pillarBlocks}${miscBlock ? `\n\n${miscBlock}` : ""}`;
 }
+
+/** Single-call context for check-in — brain dump + board in one synthesis request. */
+export function buildDirectCheckInPrompt(
+  ctx: OrchestrationContext,
+  openTaskIds: number[],
+  brainDump: string
+) {
+  const base = buildDirectPrioritizePrompt(ctx, openTaskIds);
+  return base.replace(
+    "Mode: prioritize (existing tasks only — no new tasks)",
+    `Mode: check-in (re-prioritize board + extract new tasks from brain dump)
+
+USER BRAIN DUMP (resolve shorthand using pillar context; dedupe against existing tasks):
+${brainDump.trim()}`
+  );
+}

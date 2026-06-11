@@ -23,7 +23,9 @@ import { useCallback, useEffect, useState } from "react";
 import PillarColorDot from "./PillarColorDot";
 import PillarColorPicker from "./PillarColorPicker";
 import PillarContextField from "./PillarContextField";
+import PillarTasksModal from "./PillarTasksModal";
 import { DEFAULT_PILLAR_COLOR, pillarColorVars } from "../lib/pillar-colors";
+import { taskBelongsToPillarGroup } from "../lib/life-admin";
 import {
   appendPillarContext,
   latestPillarContextSnippet,
@@ -53,6 +55,14 @@ type Milestone = {
   target_date: string | null;
   rank: number;
   completed_at: string | null;
+};
+
+type Task = {
+  id: number;
+  title: string;
+  deadline: string | null;
+  completed_at: string | null;
+  pillar_id: number | null;
 };
 
 function DragHandle({
@@ -308,6 +318,8 @@ function SortablePillarCard({
   newMilestoneDate,
   onNewMilestoneChange,
   onNewMilestoneDateChange,
+  taskCount,
+  onShowTasks,
 }: {
   pillar: Pillar;
   index: number;
@@ -328,6 +340,8 @@ function SortablePillarCard({
   newMilestoneDate: string;
   onNewMilestoneChange: (value: string) => void;
   onNewMilestoneDateChange: (value: string) => void;
+  taskCount: number;
+  onShowTasks: () => void;
 }) {
   const {
     attributes,
@@ -394,12 +408,26 @@ function SortablePillarCard({
               {latestPillarContextSnippet(pillar.description)}
             </span>
           )}
+          {collapsed && taskCount > 0 && (
+            <span className="pill pillSubtle">
+              {taskCount} task{taskCount === 1 ? "" : "s"}
+            </span>
+          )}
           {collapsed && shownMilestones.length > 0 && (
             <span className="pill pillSubtle">
               {shownMilestones.length} milestone{shownMilestones.length === 1 ? "" : "s"}
             </span>
           )}
         </div>
+        {collapsed && (
+          <button
+            type="button"
+            className="btnCompact outlineButton pillarHeaderTasksBtn"
+            onClick={onShowTasks}
+          >
+            Tasks{taskCount > 0 ? ` (${taskCount})` : ""}
+          </button>
+        )}
         <button
           type="button"
           className="collapseBtn"
@@ -431,6 +459,13 @@ function SortablePillarCard({
               onBlur={(e) => onAbbreviationBlur(pillar.id, e.target.value)}
               onKeyDown={(e) => e.key === "Enter" && e.currentTarget.blur()}
             />
+            <button
+              type="button"
+              className="btnCompact outlineButton pillarMetaBtn"
+              onClick={onShowTasks}
+            >
+              Tasks{taskCount > 0 ? ` (${taskCount})` : ""}
+            </button>
             <button
               type="button"
               className="btnCompact outlineButton pillarMetaBtn"
@@ -543,7 +578,9 @@ export default function PillarsSetup({ onboarding = false }: { onboarding?: bool
   const router = useRouter();
   const [pillars, setPillars] = useState<Pillar[]>([]);
   const [milestones, setMilestones] = useState<Milestone[]>([]);
+  const [tasks, setTasks] = useState<Task[]>([]);
   const [loading, setLoading] = useState(true);
+  const [tasksModalPillarId, setTasksModalPillarId] = useState<number | null>(null);
   const [collapsed, setCollapsed] = useState<Record<number, boolean>>({});
   const [newPillar, setNewPillar] = useState("");
   const [newPillarDescription, setNewPillarDescription] = useState("");
@@ -562,12 +599,17 @@ export default function PillarsSetup({ onboarding = false }: { onboarding?: bool
   );
 
   const load = useCallback(async () => {
-    const res = await fetch("/api/pillars");
-    const data = await res.json();
+    const [pillarsRes, tasksRes] = await Promise.all([
+      fetch("/api/pillars"),
+      fetch("/api/tasks"),
+    ]);
+    const data = await pillarsRes.json();
+    const tasksData = await tasksRes.json();
     if (data.ok) {
       setPillars(data.pillars);
       setMilestones(data.milestones);
     }
+    if (tasksData.ok) setTasks(tasksData.tasks);
     setLoading(false);
   }, []);
 
@@ -770,6 +812,25 @@ export default function PillarsSetup({ onboarding = false }: { onboarding?: bool
     setMilestoneDialog({ action: "delete", id, title });
   }
 
+  function taskCountForPillar(pillar: Pillar) {
+    return tasks.filter((t) => taskBelongsToPillarGroup(t, pillar)).length;
+  }
+
+  async function togglePillarTask(id: number, completed: boolean) {
+    await fetch(`/api/tasks/${id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ completed }),
+    });
+    setTasks((prev) =>
+      prev.map((t) =>
+        t.id === id
+          ? { ...t, completed_at: completed ? new Date().toISOString() : null }
+          : t
+      )
+    );
+  }
+
   async function confirmMilestoneAction() {
     if (!milestoneDialog) return;
     const dialog = milestoneDialog;
@@ -811,6 +872,13 @@ export default function PillarsSetup({ onboarding = false }: { onboarding?: bool
   const pillarIds = pillars.map((p) => `pillar-${p.id}`);
   const allCollapsed =
     pillars.length > 0 && pillars.every((pillar) => collapsed[pillar.id]);
+  const tasksModalPillar =
+    tasksModalPillarId != null
+      ? pillars.find((p) => p.id === tasksModalPillarId)
+      : null;
+  const tasksModalPillarRank = tasksModalPillar
+    ? pillars.findIndex((p) => p.id === tasksModalPillar.id) + 1
+    : 0;
 
   return (
     <div className="sections">
@@ -918,10 +986,22 @@ export default function PillarsSetup({ onboarding = false }: { onboarding?: bool
               onNewMilestoneDateChange={(v) =>
                 setNewMilestoneDates((prev) => ({ ...prev, [pillar.id]: v }))
               }
+              taskCount={taskCountForPillar(pillar)}
+              onShowTasks={() => setTasksModalPillarId(pillar.id)}
             />
           ))}
         </SortableContext>
       </DndContext>
+
+      {tasksModalPillar && (
+        <PillarTasksModal
+          pillar={tasksModalPillar}
+          rank={tasksModalPillarRank}
+          tasks={tasks}
+          onClose={() => setTasksModalPillarId(null)}
+          onToggleTask={(id, completed) => void togglePillarTask(id, completed)}
+        />
+      )}
 
       {onboarding && pillars.length > 0 && (
         <div className="onboardingActions">

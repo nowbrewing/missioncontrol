@@ -1,10 +1,8 @@
 import { generateGeminiText } from "./gemini-text";
-import { PILLAR_SPECIALIST_INSTRUCTION } from "./pillar-specialist-prompt";
 import { LIFE_SYNTHESIS_INSTRUCTION } from "./life-synthesis-prompt";
 import {
+  buildDirectCheckInPrompt,
   buildDirectPrioritizePrompt,
-  buildLifeSynthesisPrompt,
-  buildPillarSpecialistPrompt,
   loadOrchestrationContext,
 } from "./build-orchestration-context";
 import {
@@ -27,33 +25,6 @@ export type MissionOrchestrationResult = {
   proposedTasks: ParsedProposedTaskFromOrchestration[];
 };
 
-async function runPillarSpecialists(
-  ctx: Awaited<ReturnType<typeof loadOrchestrationContext>>,
-  mode: "check_in" | "prioritize",
-  brainDump?: string
-) {
-  const reports: { pillarName: string; pillarRank: number; report: string }[] =
-    [];
-
-  for (const pillar of ctx.pillars) {
-    const contextBlock = buildPillarSpecialistPrompt(
-      ctx,
-      pillar,
-      mode,
-      brainDump
-    );
-    const prompt = `${PILLAR_SPECIALIST_INSTRUCTION}\n\n${contextBlock}`;
-    const raw = await generateGeminiText(prompt);
-    reports.push({
-      pillarName: String(pillar.name),
-      pillarRank: Number(pillar.rank),
-      report: raw,
-    });
-  }
-
-  return reports;
-}
-
 export async function runMissionOrchestration(params: {
   userId: number;
   planDate: string;
@@ -65,27 +36,13 @@ export async function runMissionOrchestration(params: {
 
   let synthesisRaw: string;
 
-  if (params.mode === "prioritize") {
-    const directContext = buildDirectPrioritizePrompt(ctx, openTaskIds);
-    synthesisRaw = await generateGeminiText(
-      `${LIFE_SYNTHESIS_INSTRUCTION}\n\n${directContext}`
-    );
-  } else {
-    const pillarReports = await runPillarSpecialists(
-      ctx,
-      params.mode,
-      params.brainDump
-    );
-    const synthesisContext = buildLifeSynthesisPrompt(
-      ctx,
-      pillarReports,
-      params.mode,
-      openTaskIds
-    );
-    synthesisRaw = await generateGeminiText(
-      `${LIFE_SYNTHESIS_INSTRUCTION}\n\n${synthesisContext}`
-    );
-  }
+  const directContext =
+    params.mode === "check_in"
+      ? buildDirectCheckInPrompt(ctx, openTaskIds, params.brainDump ?? "")
+      : buildDirectPrioritizePrompt(ctx, openTaskIds);
+  synthesisRaw = await generateGeminiText(
+    `${LIFE_SYNTHESIS_INSTRUCTION}\n\n${directContext}`
+  );
 
   const parsed = parseSynthesisResult(
     synthesisRaw,

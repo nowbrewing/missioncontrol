@@ -131,7 +131,7 @@ export type MongoDailyLog = {
   updatedAt: Date;
 };
 
-export type DailyLogKind = "went_well" | "went_poorly" | "daily_focus";
+export type DailyLogKind = "went_well" | "went_poorly" | "daily_focus" | "assistant_chat";
 
 export type MongoDailyLogEntry = {
   _id?: ObjectId;

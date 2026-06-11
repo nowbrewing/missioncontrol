@@ -8,7 +8,12 @@ import {
   type DailyLogEntry,
 } from "./mongodb/store/daily-logs";
 
-export const DAILY_LOG_KINDS = ["went_well", "went_poorly", "daily_focus"] as const;
+export const DAILY_LOG_KINDS = [
+  "went_well",
+  "went_poorly",
+  "daily_focus",
+  "assistant_chat",
+] as const;
 export type DailyLogKind = (typeof DAILY_LOG_KINDS)[number];
 
 export type { DailyLogEntry };
@@ -20,6 +25,7 @@ export function groupEntriesByKind(entries: DailyLogEntry[]): DailyLogByKind {
     went_well: [],
     went_poorly: [],
     daily_focus: [],
+    assistant_chat: [],
   };
   for (const entry of entries) {
     if (entry.kind in byKind) byKind[entry.kind].push(entry);
@@ -117,6 +123,7 @@ export async function buildDailyLogAggregate(userId: number, logDate: string) {
       went_well: combineEntryText(by_kind.went_well),
       went_poorly: combineEntryText(by_kind.went_poorly),
       daily_focus: combineEntryText(by_kind.daily_focus),
+      assistant_chat: combineEntryText(by_kind.assistant_chat),
     },
   };
 }

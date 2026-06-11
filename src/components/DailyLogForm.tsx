@@ -13,6 +13,11 @@ import {
   checkInEntryLabel,
   isCheckInLogKind,
 } from "../lib/check-in-log";
+import {
+  assistantChatEntryLabel,
+  isAssistantChatLogKind,
+  logKindShowsPillarTags,
+} from "../lib/assistant-chat-log";
 import PillarChip from "./PillarChip";
 
 type Pillar = {
@@ -26,7 +31,7 @@ type Pillar = {
 type DailyLogEntry = {
   id: number;
   log_date: string;
-  kind: "went_well" | "went_poorly" | "daily_focus";
+  kind: "went_well" | "went_poorly" | "daily_focus" | "assistant_chat";
   content: string;
   pillar_ids?: number[];
   created_at: string;
@@ -38,11 +43,13 @@ const LEGACY_KIND_LABELS: Record<"went_poorly", string> = {
 
 function entryKindLabel(kind: DailyLogEntry["kind"]): string {
   if (isCheckInLogKind(kind)) return checkInEntryLabel(kind);
+  if (isAssistantChatLogKind(kind)) return assistantChatEntryLabel();
   return LEGACY_KIND_LABELS[kind];
 }
 
 const KIND_ORDER: DailyLogEntry["kind"][] = [
   ...CHECK_IN_KIND_ORDER,
+  "assistant_chat",
   "went_poorly",
 ];
 
@@ -74,7 +81,7 @@ function EntryPillarTags({
   entry: DailyLogEntry;
   pillars: Pillar[];
 }) {
-  if (!isCheckInLogKind(entry.kind)) return null;
+  if (!logKindShowsPillarTags(entry.kind)) return null;
 
   const ids = entry.pillar_ids ?? [];
   const tagged = ids
