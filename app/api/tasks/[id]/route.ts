@@ -18,6 +18,7 @@ export const PATCH = async (req: Request, { params }: Params) => {
     const body = (await req.json()) as {
       title?: string;
       description?: string;
+      note?: string | null;
       deadline?: string | null;
       completed?: boolean;
       pillar_id?: number | null;
@@ -33,6 +34,7 @@ export const PATCH = async (req: Request, { params }: Params) => {
     const patch: Partial<{
       title: string;
       description: string | null;
+      note: string | null;
       deadline: string | null;
       completedAt: string | null;
       pillarId: number | null;
@@ -51,6 +53,9 @@ export const PATCH = async (req: Request, { params }: Params) => {
     }
     if (body.description !== undefined) {
       patch.description = body.description?.trim() || null;
+    }
+    if (body.note !== undefined) {
+      patch.note = body.note?.trim() || null;
     }
     if (body.deadline !== undefined) {
       patch.deadline = body.deadline;

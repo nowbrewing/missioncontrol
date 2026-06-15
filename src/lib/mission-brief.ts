@@ -52,6 +52,7 @@ export async function buildMissionBrief(userId: number, focusDate?: string) {
       id: Number(t.id),
       title: String(t.title),
       description: t.description ? String(t.description) : null,
+      note: t.note ? String(t.note) : null,
       deadline: t.deadline ? String(t.deadline) : null,
       schedule_type: t.schedule_type ? String(t.schedule_type) : "flexible",
       window_start: t.window_start ? String(t.window_start) : null,
@@ -143,6 +144,7 @@ export async function buildMissionBrief(userId: number, focusDate?: string) {
     coming_up_next: comingUpNext,
     board_today: board.today,
     board_coming_up: board.coming_up,
+    board_done_today: board.done_today,
     reflection,
     life_admin,
   };

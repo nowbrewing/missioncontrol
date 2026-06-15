@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { summarizeAndSaveChatSession } from "../../../../../src/lib/adk/summarize-chat-session";
+import { extractChatTaskNotes } from "../../../../../src/lib/adk/extract-chat-task-notes";
 import type { LifeAgentMessage } from "../../../../../src/lib/adk/run-life-agent";
 import { requireSessionUser } from "../../../../../src/lib/auth";
 import { isYyyyMmDd, todayIsoYyyyMmDd } from "../../../../../src/lib/date";
@@ -28,7 +28,7 @@ export async function POST(req: Request) {
         m.content.trim()
     );
 
-    const result = await summarizeAndSaveChatSession({
+    const result = await extractChatTaskNotes({
       userId: user.id,
       planDate,
       messages,
@@ -36,19 +36,18 @@ export async function POST(req: Request) {
 
     if (!result) {
       return NextResponse.json(
-        { ok: false, error: "Nothing to summarize" },
+        { ok: false, error: "Nothing to save" },
         { status: 400 }
       );
     }
 
     return NextResponse.json({
       ok: true,
-      summary: result.summary,
-      pillar_ids: result.pillar_ids,
-      entry_id: result.entry_id,
+      task_note_updates: result.task_note_updates,
+      new_tasks: result.new_tasks,
     });
   } catch (e: unknown) {
-    const msg = e instanceof Error ? e.message : "Summarize failed";
+    const msg = e instanceof Error ? e.message : "Extract notes failed";
     const status = msg === "Unauthorized" ? 401 : 500;
     console.error("[mission/chat/summarize]", e);
     return NextResponse.json({ ok: false, error: msg }, { status });

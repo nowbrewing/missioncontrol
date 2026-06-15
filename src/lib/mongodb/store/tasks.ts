@@ -11,6 +11,7 @@ function taskToRow(t: MongoTask) {
     user_id: t.tursoUserId,
     title: t.title,
     description: t.description,
+    note: t.note ?? null,
     deadline: toDateOnly(t.deadline),
     completed_at: toIso(t.completedAt),
     rank: t.rank,
@@ -70,6 +71,7 @@ export async function insertTask(
   data: {
     title: string;
     description?: string | null;
+    note?: string | null;
     deadline?: string | null;
     rank: number;
     pillarId?: number | null;
@@ -94,6 +96,7 @@ export async function insertTask(
     tursoUserId: userId,
     title: data.title,
     description: data.description ?? null,
+    note: data.note ?? null,
     deadline: data.deadline ? new Date(`${data.deadline}T12:00:00Z`) : null,
     rank: data.rank,
     pillarId: data.pillarId ?? null,
@@ -123,6 +126,7 @@ export async function updateTask(
   patch: Partial<{
     title: string;
     description: string | null;
+    note: string | null;
     deadline: string | null;
     completedAt: string | null;
     rank: number;
@@ -138,6 +142,7 @@ export async function updateTask(
   const set: Partial<MongoTask> = {};
   if (patch.title !== undefined) set.title = patch.title;
   if (patch.description !== undefined) set.description = patch.description;
+  if (patch.note !== undefined) set.note = patch.note;
   if (patch.rank !== undefined) set.rank = patch.rank;
   if (patch.pillarId !== undefined) set.pillarId = patch.pillarId;
   if (patch.milestoneId !== undefined) set.milestoneId = patch.milestoneId;

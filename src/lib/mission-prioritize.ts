@@ -6,6 +6,7 @@ export type MissionTask = {
   id: number;
   title: string;
   description?: string | null;
+  note?: string | null;
   deadline: string | null;
   schedule_type?: string | null;
   window_start?: string | null;
@@ -106,7 +107,7 @@ export function getComingUpNext(
   tasks: MissionTask[],
   milestones: MissionMilestone[],
   today: string,
-  horizonDays = 14
+  horizonDays = 7
 ): ComingUpItem[] {
   const end = addDaysIsoYyyyMmDd(today, horizonDays);
   const items: ComingUpItem[] = [];

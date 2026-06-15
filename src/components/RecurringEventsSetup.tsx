@@ -34,6 +34,7 @@ type RecurringEvent = {
   milestone_id: number | null;
   spawn_task_cards: number;
   active: number;
+  rules?: string | null;
 };
 
 type EventFormState = {
@@ -45,6 +46,7 @@ type EventFormState = {
   pillarId: number | null;
   milestoneId: number | null;
   spawnTaskCards: boolean;
+  rules: string;
 };
 
 const KIND_LABELS: Record<RecurringKind, string> = {
@@ -61,6 +63,7 @@ const EMPTY_FORM: EventFormState = {
   pillarId: null,
   milestoneId: null,
   spawnTaskCards: false,
+  rules: "",
 };
 
 function eventKindLabel(event: RecurringEvent): string {
@@ -88,6 +91,7 @@ function formFromEvent(event: RecurringEvent): EventFormState {
     pillarId: event.pillar_id,
     milestoneId: event.milestone_id,
     spawnTaskCards: !!event.spawn_task_cards,
+    rules: event.rules ?? "",
   };
 }
 
@@ -99,6 +103,7 @@ function buildEventPayload(form: EventFormState): Record<string, unknown> {
     pillar_id: form.pillarId,
     milestone_id: form.milestoneId,
     spawn_task_cards: form.spawnTaskCards,
+    rules: form.rules.trim() || null,
   };
 
   if (form.kind === "daily") {
@@ -269,6 +274,23 @@ function EventFormFieldsWithPillars({
         />
         Also create individual task cards each week
       </label>
+
+      <div className="modalField">
+        <label className="modalLabel" htmlFor={`${idPrefix}-rules`}>
+          Scheduling rules (optional)
+        </label>
+        <textarea
+          id={`${idPrefix}-rules`}
+          className="invInput routineRulesInput"
+          rows={3}
+          value={form.rules}
+          onChange={(e) => onChange({ rules: e.target.value })}
+          placeholder="e.g. Nudge me if I miss a day. Don't schedule back-to-back unless I'm behind for the week."
+        />
+        <p className="sectionHint missionIntakeDateHint">
+          Guidance for the assistant about this habit only.
+        </p>
+      </div>
     </>
   );
 }
@@ -295,6 +317,11 @@ function EventMetaPills({ event }: { event: RecurringEvent }) {
         </span>
       )}
       {!event.active && <span className="pill pillWarn">Inactive</span>}
+      {event.rules?.trim() ? (
+        <span className="pill pillSubtle" title={event.rules.trim()}>
+          has rules
+        </span>
+      ) : null}
     </>
   );
 }
@@ -445,11 +472,15 @@ export default function RecurringEventsSetup({
     if (!addForm.title.trim() || saving) return;
     setSaving(true);
     try {
-      await fetch("/api/recurring-events", {
+      const res = await fetch("/api/recurring-events", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(buildEventPayload(addForm)),
       });
+      const data = await res.json();
+      if (!res.ok || !data.ok) {
+        throw new Error(data.error || "Could not create routine");
+      }
       setShowAddRoutine(false);
       resetAddForm();
       await load();

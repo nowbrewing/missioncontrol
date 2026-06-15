@@ -33,6 +33,7 @@ export const PATCH = async (req: Request, { params }: Params) => {
       milestone_id?: number | null;
       spawn_task_cards?: boolean;
       active?: boolean;
+      rules?: string | null;
     };
 
     const patch: Partial<{
@@ -45,6 +46,7 @@ export const PATCH = async (req: Request, { params }: Params) => {
       milestoneId: number | null;
       spawnTaskCards: boolean;
       active: boolean;
+      rules: string | null;
     }> = {};
     let nextKind: RecurringKind | undefined;
     let nextTallyEnabled: boolean | undefined;
@@ -99,6 +101,9 @@ export const PATCH = async (req: Request, { params }: Params) => {
     }
     if (body.active !== undefined) {
       patch.active = !!body.active;
+    }
+    if (body.rules !== undefined) {
+      patch.rules = body.rules?.trim() || null;
     }
 
     if (Object.keys(patch).length === 0) {

@@ -14,6 +14,9 @@ export default async function TopNav() {
         {user && (
           <div className="topbarActions">
             <nav className="topbarNav">
+              <Link href="/reflection">Reflection</Link>
+              <Link href="/correction">Correction</Link>
+              <Link href="/thinkpad">Thinkpad</Link>
               <Link href="/pillars">Pillars</Link>
               <Link href="/scheduling">Routines</Link>
               <Link href="/daily">Daily logs</Link>

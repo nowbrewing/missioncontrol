@@ -10,6 +10,8 @@ import { listGoals } from "../mongodb/store/goals";
 import { listMilestones } from "../mongodb/store/milestones";
 import { listTasks } from "../mongodb/store/tasks";
 import { getUserPreferences, listPillars } from "../mongodb/store/users";
+import { listActiveRoutines } from "../mongodb/store/routines";
+import { formatRoutineForPrompt } from "../routine-rules";
 import { LIFE_ADMIN_PILLAR_NAME } from "../life-admin";
 import { listWentWellEntries } from "../mongodb/store/daily-logs";
 import { formatWentWellEntriesForPrompt } from "../went-well-context";
@@ -29,13 +31,14 @@ export async function buildOpenChatContext(
   const since = addDaysIsoYyyyMmDd(planDate, -(plan.lookback_days - 1));
   const focusedSet = new Set(plan.focused_pillar_ids);
 
-  const [pillars, goals, milestones, tasks, preferencesRaw, logEntries, wentWellEntries] =
+  const [pillars, goals, milestones, tasks, preferencesRaw, routines, logEntries, wentWellEntries] =
     await Promise.all([
       listPillars(userId),
       listGoals(userId),
       listMilestones(userId),
       listTasks(userId),
       getUserPreferences(userId),
+      listActiveRoutines(userId),
       listDailyLogEntriesInRange(userId, since, planDate),
       listWentWellEntries(userId, since, planDate),
     ]);
@@ -75,7 +78,10 @@ Open tasks:
 ${
   pillarTasks.length
     ? pillarTasks
-        .map((t) => `- ${t.title}${t.deadline ? ` — due ${t.deadline}` : ""}`)
+        .map(
+          (t) =>
+            `- id=${t.id} ${t.title}${t.deadline ? ` — due ${t.deadline}` : ""}`
+        )
         .join("\n")
     : "(none)"
 }
@@ -90,6 +96,22 @@ ${
     .join("\n\n");
 
   const openTaskCount = tasks.filter((t) => !t.completed_at).length;
+  const openTasksIndex = tasks
+    .filter((t) => !t.completed_at)
+    .slice(0, 40)
+    .map((t) => {
+      const pillarName =
+        t.pillar_id != null
+          ? pillarById.get(Number(t.pillar_id)) ?? LIFE_ADMIN_PILLAR_NAME
+          : LIFE_ADMIN_PILLAR_NAME;
+      return `- id=${t.id} "${t.title}" (${pillarName})${t.deadline ? ` due ${t.deadline}` : ""}`;
+    })
+    .join("\n");
+
+  const routinesBlock = routines
+    .map((r) => formatRoutineForPrompt(r, { includeId: true }))
+    .join("\n");
+
   const boardSnapshot = `- ${openTaskCount} open tasks across all pillars (board not re-sorted in chat)`;
 
   const logsByDate = new Map<string, typeof logEntries>();
@@ -173,6 +195,12 @@ ${focusedBlocks ? `FOCUSED PILLAR DETAIL:\n${focusedBlocks}` : ""}
 
 BOARD SNAPSHOT:
 ${boardSnapshot}
+
+OPEN TASKS (for edits — use id in task_edits):
+${openTasksIndex || "(none)"}
+
+ROUTINES (weekly habits — each may include scheduling rules):
+${routinesBlock || "(none)"}
 
 DAILY LOG (${plan.lookback_days}-day window${plan.focused_pillar_ids.length ? ", filtered to focused pillars where tagged" : ""}):
 ${dailyLogBlock || "(no matching log entries in this window)"}

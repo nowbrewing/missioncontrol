@@ -25,6 +25,7 @@ export const POST = async (req: Request) => {
     const body = (await req.json()) as {
       title?: string;
       description?: string;
+      note?: string;
       deadline?: string | null;
       pillar_id?: number | null;
       milestone_id?: number | null;
@@ -42,6 +43,7 @@ export const POST = async (req: Request) => {
     const task = await insertTask(user.id, {
       title,
       description: body.description?.trim() || null,
+      note: body.note?.trim() || null,
       deadline: body.deadline ?? null,
       rank,
       pillarId: body.pillar_id ?? null,

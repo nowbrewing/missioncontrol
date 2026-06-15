@@ -2,14 +2,23 @@ import { addDaysIsoYyyyMmDd, todayIsoYyyyMmDd } from "./date";
 import { resolvePillarAbbreviation } from "./pillar-abbreviation";
 import { isRunTask } from "./workout-schedule";
 import {
+  countProgressDone,
+  dailyCheckDone,
   dailyTallyTotal,
+  emptyProgress,
   parseDailyDays,
+  parseProgress,
   serializeDailyDays,
   weekDatesFromMonday,
   weekMondayFor,
+  type CountProgress,
+  type DailyCheckProgress,
+  type DailyTallyProgress,
   type RecurringKind,
   type RecurringProgress,
 } from "./recurring-week";
+import { getMongoDb } from "./mongodb/client";
+import { COLLECTIONS } from "./mongodb/schemas";
 import { listMilestones } from "./mongodb/store/milestones";
 import {
   getMaxTaskRank,
@@ -276,4 +285,101 @@ export async function updateRecurringProgress(
       });
     }
   }
+}
+
+export type RoutineProgressScore = {
+  done: number;
+  target: number;
+  label: string;
+};
+
+export function routineProgressScore(item: RecurringWeekItem): RoutineProgressScore {
+  if (item.kind === "daily" && item.tally_enabled) {
+    const total = dailyTallyTotal(item.progress as DailyTallyProgress);
+    const target = item.target_count > 0 ? item.target_count : total;
+    return {
+      done: total,
+      target,
+      label: item.target_count > 0 ? `${total}/${item.target_count}` : String(total),
+    };
+  }
+  if (item.kind === "daily") {
+    const done = dailyCheckDone(item.progress as DailyCheckProgress);
+    const target = item.daily_days.filter(Boolean).length;
+    return { done, target, label: `${done}/${target}` };
+  }
+  const done = countProgressDone(item.progress as CountProgress);
+  return { done, target: item.target_count, label: `${done}/${item.target_count}` };
+}
+
+/** Read routine progress for a past or current week without spawning task cards. */
+export async function loadRecurringWeekSnapshot(
+  userId: number,
+  weekMonday: string
+): Promise<RecurringWeekItem[]> {
+  const db = await getMongoDb();
+  const events = await listActiveRoutines(userId);
+  const [pillars, milestones] = await Promise.all([
+    listPillars(userId),
+    listMilestones(userId),
+  ]);
+
+  const pillarById = new Map(pillars.map((p) => [Number(p.id), p]));
+  const milestoneById = new Map(milestones.map((m) => [Number(m.id), m]));
+  const weekDates = weekDatesFromMonday(weekMonday);
+
+  const items: RecurringWeekItem[] = [];
+
+  for (const event of events) {
+    const tallyEnabled = !!event.tallyEnabled;
+    const progressRow = await db
+      .collection(COLLECTIONS.routine_progress)
+      .findOne({ tursoUserId: userId, routineId: event.tursoId, weekMonday });
+
+    const progress: RecurringProgress = progressRow
+      ? parseProgress(
+          JSON.stringify(progressRow.progress),
+          event.kind,
+          event.targetFrequency,
+          tallyEnabled
+        )
+      : emptyProgress(event.kind, event.targetFrequency, tallyEnabled);
+
+    const pillar = event.pillarId ? pillarById.get(event.pillarId) : null;
+    const milestone = event.milestoneId ? milestoneById.get(event.milestoneId) : null;
+
+    items.push({
+      event_id: event.tursoId,
+      progress_id: progressRow?.tursoId ?? 0,
+      title: event.title,
+      kind: event.kind,
+      target_count: event.targetFrequency,
+      daily_days: parseDailyDays(
+        serializeDailyDays(event.dailyDays as ReturnType<typeof parseDailyDays>)
+      ),
+      tally_enabled: tallyEnabled,
+      pillar_id: event.pillarId,
+      milestone_id: event.milestoneId,
+      pillar_name: pillar ? String(pillar.name) : null,
+      pillar_color: pillar ? String(pillar.color) : null,
+      pillar_abbreviation: pillar
+        ? resolvePillarAbbreviation(
+            String(pillar.name),
+            pillar.abbreviation as string | null | undefined
+          )
+        : null,
+      milestone_title: milestone ? String(milestone.title) : null,
+      spawn_task_cards: event.spawnTaskCards,
+      week_monday: weekMonday,
+      week_dates: weekDates,
+      progress,
+      tasks_spawned: !!progressRow?.tasksSpawned,
+    });
+  }
+
+  return items.sort((a, b) => {
+    const ar = events.find((e) => e.tursoId === a.event_id)?.rank ?? 0;
+    const br = events.find((e) => e.tursoId === b.event_id)?.rank ?? 0;
+    return ar - br;
+  });
 }

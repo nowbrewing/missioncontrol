@@ -19,6 +19,7 @@ export type MongoUser = {
   name: string;
   passwordHash: string;
   preferences: string | null;
+  routineRules: string | null;
   pillars: MongoPillar[];
   createdAt: Date;
 };
@@ -74,6 +75,7 @@ export type MongoTask = {
   milestoneId: number | null;
   title: string;
   description: string | null;
+  note: string | null;
   deadline: Date | null;
   bucket: TaskBucket | null;
   status: TaskStatus;
@@ -104,6 +106,7 @@ export type MongoRoutine = {
   spawnTaskCards: boolean;
   active: boolean;
   rank: number;
+  rules: string | null;
   createdAt: Date;
 };
 
@@ -131,7 +134,12 @@ export type MongoDailyLog = {
   updatedAt: Date;
 };
 
-export type DailyLogKind = "went_well" | "went_poorly" | "daily_focus" | "assistant_chat";
+export type DailyLogKind =
+  | "went_well"
+  | "went_poorly"
+  | "daily_focus"
+  | "assistant_chat"
+  | "weekly_summary";
 
 export type MongoDailyLogEntry = {
   _id?: ObjectId;
@@ -142,6 +150,8 @@ export type MongoDailyLogEntry = {
   content: string;
   /** Empty or omitted = general / cross-pillar win */
   pillarIds?: number[];
+  /** Monday (YYYY-MM-DD) of the week this summary covers — weekly_summary only */
+  weekMonday?: string;
   createdAt: Date;
 };
 

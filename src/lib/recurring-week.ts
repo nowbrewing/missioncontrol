@@ -139,6 +139,13 @@ export function dailyTallyTotal(progress: DailyTallyProgress): number {
   );
 }
 
+/** Progress bar fill — clamped at 0 when the running total is negative. */
+export function tallyBarFillPercent(total: number, targetCount: number): number {
+  if (targetCount <= 0) return 0;
+  const barTotal = Math.max(0, total);
+  return Math.min(100, (barTotal / targetCount) * 100);
+}
+
 export function normalizeRecurringKind(
   kind: string,
   tallyEnabled: number | boolean

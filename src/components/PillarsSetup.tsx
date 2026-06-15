@@ -18,6 +18,7 @@ import {
   verticalListSortingStrategy,
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 import PillarColorDot from "./PillarColorDot";
@@ -63,6 +64,7 @@ type Task = {
   deadline: string | null;
   completed_at: string | null;
   pillar_id: number | null;
+  milestone_id: number | null;
 };
 
 function DragHandle({
@@ -897,13 +899,18 @@ export default function PillarsSetup({ onboarding = false }: { onboarding?: bool
         <h2 className="sectionTitle" style={{ margin: 0 }}>
           Your pillars
         </h2>
-        <button
-          type="button"
-          className="chatSendBtn"
-          onClick={() => setShowAddPillar(true)}
-        >
-          Add pillar
-        </button>
+        <div className="pillarsPageHeaderActions">
+          <Link href="/tasks" className="outlineButton">
+            All tasks
+          </Link>
+          <button
+            type="button"
+            className="chatSendBtn"
+            onClick={() => setShowAddPillar(true)}
+          >
+            Add pillar
+          </button>
+        </div>
       </div>
 
       {pillars.length > 0 && (
@@ -998,8 +1005,10 @@ export default function PillarsSetup({ onboarding = false }: { onboarding?: bool
           pillar={tasksModalPillar}
           rank={tasksModalPillarRank}
           tasks={tasks}
+          milestones={milestones}
           onClose={() => setTasksModalPillarId(null)}
           onToggleTask={(id, completed) => void togglePillarTask(id, completed)}
+          onTaskAdded={load}
         />
       )}
 

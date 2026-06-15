@@ -6,7 +6,7 @@ const MISSION_CONTROL_ABOUT = {
   lead: "Your daily command center for life planning.",
   points: [
     "Check-in and AI-prioritized tasks for today",
-    "This week board, pillars, and milestones",
+    "Next 7 days board, pillars, and milestones",
     "Daily logs, routines, and pillars in one place",
   ],
 };

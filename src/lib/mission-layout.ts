@@ -1,4 +1,5 @@
 import { isDaySpecificScheduled, shouldSurfaceOverdueOnToday, taskBelongsInTodayPriorities } from "./task-schedule";
+import { isInNext7Days } from "./mission-buckets";
 import type { ComingUpItem, MissionMilestone, MissionTask } from "./mission-prioritize";
 
 export type MissionLayoutRef = {
@@ -39,6 +40,7 @@ export type BoardItem = {
   kind: "task" | "milestone";
   id: number;
   title: string;
+  note?: string | null;
   date: string | null;
   schedule_type?: string | null;
   window_start?: string | null;
@@ -56,6 +58,39 @@ export type BoardItem = {
 
 export function boardItemKey(kind: "task" | "milestone", id: number) {
   return `${kind}-${id}`;
+}
+
+export function completedOnDate(completedAt: string, dateIso: string) {
+  return completedAt.slice(0, 10) === dateIso;
+}
+
+function collectDoneTodayItems(
+  allTasks: MissionTask[],
+  layoutToday: MissionLayoutRef[],
+  todayTaskCandidates: MissionTask[],
+  todayIso: string
+): BoardItem[] {
+  const eligibleIds = new Set<number>();
+  for (const ref of layoutToday) {
+    if (ref.kind === "task") eligibleIds.add(ref.id);
+  }
+  for (const task of todayTaskCandidates) {
+    eligibleIds.add(task.id);
+  }
+
+  const items: BoardItem[] = [];
+  const seen = new Set<string>();
+  for (const task of allTasks) {
+    if (!eligibleIds.has(task.id)) continue;
+    if (!task.completed_at || !completedOnDate(task.completed_at, todayIso)) {
+      continue;
+    }
+    const key = boardItemKey("task", task.id);
+    if (seen.has(key)) continue;
+    seen.add(key);
+    items.push(taskToBoardItem(task));
+  }
+  return items;
 }
 
 export function sortComingUpByDate(items: BoardItem[]): BoardItem[] {
@@ -89,6 +124,20 @@ export function sortTodayBoardItems(
   });
 }
 
+/** Open tasks first (stable order), completed tasks last — for live Today list UX. */
+export function sortTodayWithCompletedAtBottom(items: BoardItem[]): BoardItem[] {
+  const open: BoardItem[] = [];
+  const done: BoardItem[] = [];
+  for (const item of items) {
+    if (item.kind === "task" && item.completed_at) {
+      done.push(item);
+    } else {
+      open.push(item);
+    }
+  }
+  return [...open, ...done];
+}
+
 export function parseMissionLayout(raw: string | null | undefined): MissionLayout | null {
   if (!raw) return null;
   try {
@@ -106,6 +155,7 @@ function taskToBoardItem(task: MissionTask): BoardItem {
     kind: "task",
     id: task.id,
     title: task.title,
+    note: task.note,
     date: task.deadline,
     schedule_type: task.schedule_type,
     window_start: task.window_start,
@@ -199,6 +249,7 @@ export function buildMissionBoard(
       (t) =>
         !t.completed_at &&
         t.deadline &&
+        isInNext7Days(t.deadline, todayIso) &&
         !taskBelongsInTodayPriorities(t, todayIso)
     )
     .map((t) => comingUpToBoardItem({
@@ -221,9 +272,17 @@ export function buildMissionBoard(
   );
 
   if (!savedLayout) {
+    const today = sortTodayBoardItems(defaultToday, pillarRankById);
+    const done_today = collectDoneTodayItems(
+      allTasks,
+      [],
+      todayTasks.filter((t) => taskBelongsInTodayPriorities(t, todayIso)),
+      todayIso
+    );
     return {
-      today: sortTodayBoardItems(defaultToday, pillarRankById),
+      today,
       coming_up: defaultComingUp,
+      done_today,
     };
   }
 
@@ -308,7 +367,14 @@ export function buildMissionBoard(
     today.splice(0, today.length, ...sortTodayBoardItems(today, pillarRankById));
   }
 
-  return { today, coming_up: sortComingUpByDate(comingUpFiltered) };
+  const done_today = collectDoneTodayItems(
+    allTasks,
+    savedLayout.today,
+    todayTasks,
+    todayIso
+  );
+
+  return { today, coming_up: sortComingUpByDate(comingUpFiltered), done_today };
 }
 
 export function boardToLayout(

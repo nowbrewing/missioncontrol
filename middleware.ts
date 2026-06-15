@@ -6,6 +6,9 @@ const PROTECTED_PREFIXES = [
   "/daily",
   "/tasks",
   "/mission",
+  "/thinkpad",
+  "/reflection",
+  "/correction",
   "/scheduling",
 ];
 
@@ -33,6 +36,9 @@ export const config = {
     "/daily/:path*",
     "/tasks/:path*",
     "/mission/:path*",
+    "/thinkpad/:path*",
+    "/reflection/:path*",
+    "/correction/:path*",
     "/scheduling/:path*",
   ],
 };

@@ -3,6 +3,7 @@ import type { MissionTask } from "./mission-prioritize";
 
 export type TaskBriefPatch = {
   title?: string;
+  note?: string | null;
   pillar_id?: number | null;
   milestone_id?: number | null;
   milestone_title?: string | null;
@@ -13,6 +14,7 @@ export type TaskBriefPatch = {
   pillar_name?: string | null;
   pillar_abbreviation?: string | null;
   pillar_color?: string | null;
+  completed_at?: string | null;
 };
 
 type BriefSlice = {
@@ -20,6 +22,7 @@ type BriefSlice = {
   today_priorities: MissionTask[];
   board_today: BoardItem[];
   board_coming_up: BoardItem[];
+  board_done_today?: BoardItem[];
 };
 
 export function patchTaskInBrief<T extends BriefSlice>(
@@ -34,6 +37,7 @@ export function patchTaskInBrief<T extends BriefSlice>(
     if (item.kind !== "task" || item.id !== id) return item;
     const next = { ...item };
     if (patch.title !== undefined) next.title = patch.title;
+    if (patch.note !== undefined) next.note = patch.note;
     if (patch.pillar_id !== undefined) next.pillar_id = patch.pillar_id;
     if (patch.milestone_id !== undefined) next.milestone_id = patch.milestone_id;
     if (patch.milestone_title !== undefined) next.milestone_title = patch.milestone_title;
@@ -46,6 +50,7 @@ export function patchTaskInBrief<T extends BriefSlice>(
       next.pillar_abbreviation = patch.pillar_abbreviation;
     }
     if (patch.pillar_color !== undefined) next.pillar_color = patch.pillar_color;
+    if (patch.completed_at !== undefined) next.completed_at = patch.completed_at;
     return next;
   };
 
@@ -55,5 +60,6 @@ export function patchTaskInBrief<T extends BriefSlice>(
     today_priorities: brief.today_priorities.map(applyTask),
     board_today: brief.board_today.map(applyBoard),
     board_coming_up: sortComingUpByDate(brief.board_coming_up.map(applyBoard)),
+    board_done_today: (brief.board_done_today ?? []).map(applyBoard),
   };
 }

@@ -57,6 +57,7 @@ export async function createUser(email: string, name: string, passwordHash: stri
     name,
     passwordHash,
     preferences: null,
+    routineRules: null,
     pillars: [],
     createdAt: new Date(),
   };

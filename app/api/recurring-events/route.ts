@@ -36,6 +36,7 @@ export const POST = async (req: Request) => {
       pillar_id?: number | null;
       milestone_id?: number | null;
       spawn_task_cards?: boolean;
+      rules?: string | null;
     };
 
     const title = body.title?.trim();
@@ -82,6 +83,7 @@ export const POST = async (req: Request) => {
       milestoneId: body.milestone_id ?? null,
       spawnTaskCards: !!body.spawn_task_cards,
       rank,
+      rules: body.rules?.trim() || null,
     });
 
     return NextResponse.json({ ok: true, event });
