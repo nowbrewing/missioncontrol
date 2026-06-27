@@ -257,7 +257,7 @@ export default function PillarNoteFields({
         body: JSON.stringify({ note_fields: nextFields }),
       });
       const data = await res.json();
-      if (!data.ok) return false;
+      if (!data.ok) return;
 
       const res2 = await fetch("/api/pillars");
       const pillarsData = await res2.json();
@@ -268,7 +268,6 @@ export default function PillarNoteFields({
         onFieldsChange(nextFields, localValues);
       }
       setManagerOpen(false);
-      return true;
     } finally {
       setSavingDefs(false);
     }

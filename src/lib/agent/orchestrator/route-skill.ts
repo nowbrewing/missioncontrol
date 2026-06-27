@@ -1,7 +1,7 @@
 import { generateGeminiText } from "../../adk/gemini-text";
 import type { LifeAgentMessage } from "../../adk/run-life-agent";
 import { buildLightAgentContext } from "../context/light-context";
-import { SKILL_REGISTRY, type SkillDefinition } from "./registry";
+import { SKILL_REGISTRY, type SkillDefinition } from "../skills/registry";
 import type { RoutedTarget, SkillId } from "../types";
 
 function formatHistory(history: LifeAgentMessage[]) {
