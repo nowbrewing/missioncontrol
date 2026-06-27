@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import ActionIconButton, { DeleteIcon } from "./ActionIconButton";
 import TaskPillarSelect from "./TaskPillarSelect";
 import { isYyyyMmDd } from "../lib/date";
 
@@ -86,15 +87,15 @@ export default function ProposedTasksReviewModal({
                 <div className="proposedTaskCardHead">
                   <span className="pill pillNew">New</span>
                   <span className="pill pillSubtle">{task.bucket}</span>
-                  <button
-                    type="button"
-                    className="rankBtn proposedTaskRemoveBtn"
+                  <ActionIconButton
+                    label={`Remove ${task.title}`}
                     onClick={() => removeTask(task.localId)}
                     disabled={saving}
-                    aria-label={`Remove ${task.title}`}
+                    variant="danger"
+                    className="proposedTaskRemoveBtn"
                   >
-                    ×
-                  </button>
+                    <DeleteIcon />
+                  </ActionIconButton>
                 </div>
 
                 <div className="modalField">

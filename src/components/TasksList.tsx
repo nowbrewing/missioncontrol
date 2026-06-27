@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { PillarHeaderBar } from "./PillarChip";
+import ActionIconButton, { DeleteIcon } from "./ActionIconButton";
 import TaskCardMeta from "./TaskCardMeta";
 import TaskDeadlineEditor from "./TaskDeadlineEditor";
 import TaskNoteEditor from "./TaskNoteEditor";
@@ -285,14 +286,13 @@ export default function TasksList({
               taskTitle={task.title}
               onChange={(note) => updateNote(task.id, note)}
             />
-            <button
-              type="button"
-              className="rankBtn"
+            <ActionIconButton
+              label="Delete task"
               onClick={() => deleteTask(task.id)}
-              aria-label="Delete task"
+              variant="danger"
             >
-              ×
-            </button>
+              <DeleteIcon />
+            </ActionIconButton>
           </div>
         </div>
       </li>

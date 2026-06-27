@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import ActionIconButton, { DeleteIcon } from "./ActionIconButton";
 import TaskPillarSelect from "./TaskPillarSelect";
 import { isYyyyMmDd } from "../lib/date";
 import { appendTaskNote } from "../lib/task-notes";
@@ -128,15 +129,15 @@ export default function ChatTaskNotesReviewModal({
                 <li key={row.localId} className="card proposedTaskCard">
                   <div className="proposedTaskCardHead">
                     <span className="pill pillSubtle">Add note</span>
-                    <button
-                      type="button"
-                      className="rankBtn proposedTaskRemoveBtn"
+                    <ActionIconButton
+                      label={`Remove note for ${row.task_title}`}
                       onClick={() => removeNoteUpdate(row.localId)}
                       disabled={saving}
-                      aria-label={`Remove note for ${row.task_title}`}
+                      variant="danger"
+                      className="proposedTaskRemoveBtn"
                     >
-                      ×
-                    </button>
+                      <DeleteIcon />
+                    </ActionIconButton>
                   </div>
 
                   <div className="modalField">
@@ -193,15 +194,15 @@ export default function ChatTaskNotesReviewModal({
                 <div className="proposedTaskCardHead">
                   <span className="pill pillNew">New task</span>
                   <span className="pill pillSubtle">{task.bucket}</span>
-                  <button
-                    type="button"
-                    className="rankBtn proposedTaskRemoveBtn"
+                  <ActionIconButton
+                    label={`Remove new task ${task.title}`}
                     onClick={() => removeNewTask(task.localId)}
                     disabled={saving}
-                    aria-label={`Remove new task ${task.title}`}
+                    variant="danger"
+                    className="proposedTaskRemoveBtn"
                   >
-                    ×
-                  </button>
+                    <DeleteIcon />
+                  </ActionIconButton>
                 </div>
 
                 <div className="modalField">

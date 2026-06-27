@@ -288,6 +288,7 @@ function RecurringItemRow({
       className={`card recurringChecklistItem ${isDragging ? "isDragging" : ""}`}
     >
       <div className="recurringChecklistItemTop">
+        <strong className="recurringChecklistTitle">{item.title}</strong>
         <button
           type="button"
           ref={setActivatorNodeRef}
@@ -298,32 +299,30 @@ function RecurringItemRow({
         >
           ⠿
         </button>
-        <div className="recurringChecklistItemBody">
-          <div className="recurringChecklistHead">
-            <strong className="recurringChecklistTitle">{item.title}</strong>
-            {item.pillar_name && (
-              <PillarChip
-                name={item.pillar_name}
-                abbreviation={item.pillar_abbreviation}
-                color={item.pillar_color}
-                compact
-              />
-            )}
-            {item.milestone_title && (
-              <span className="pill pillSubtle">{item.milestone_title}</span>
-            )}
-            <span className="pill pillSubtle recurringProgressPill">{scorecardLabel(item)}</span>
-          </div>
-
-          {item.kind === "daily" && item.tally_enabled && (
-            <DailyTallyRow item={item} today={today} onProgressChange={onProgressChange} />
-          )}
-          {item.kind === "daily" && !item.tally_enabled && (
-            <DailyCheckRow item={item} today={today} onProgressChange={onProgressChange} />
-          )}
-          {item.kind === "count" && <CountRow item={item} onProgressChange={onProgressChange} />}
-        </div>
       </div>
+
+      <div className="recurringChecklistMeta">
+        {item.pillar_name && (
+          <PillarChip
+            name={item.pillar_name}
+            abbreviation={item.pillar_abbreviation}
+            color={item.pillar_color}
+            compact
+          />
+        )}
+        {item.milestone_title && (
+          <span className="pill pillSubtle">{item.milestone_title}</span>
+        )}
+        <span className="pill pillSubtle recurringProgressPill">{scorecardLabel(item)}</span>
+      </div>
+
+      {item.kind === "daily" && item.tally_enabled && (
+        <DailyTallyRow item={item} today={today} onProgressChange={onProgressChange} />
+      )}
+      {item.kind === "daily" && !item.tally_enabled && (
+        <DailyCheckRow item={item} today={today} onProgressChange={onProgressChange} />
+      )}
+      {item.kind === "count" && <CountRow item={item} onProgressChange={onProgressChange} />}
     </li>
   );
 }
@@ -390,8 +389,8 @@ export default function MissionWeeklyChecklist({
       {orderedItems.length === 0 ? (
         <div className="card recurringChecklistEmpty">
           <p style={{ margin: 0, opacity: 0.8 }}>
-            No recurring items yet. Add habits and routines on the{" "}
-            <strong>Routines</strong> page in the nav bar.
+            No recurring items yet. Add habits on the{" "}
+            <strong>Planning</strong> page.
           </p>
         </div>
       ) : (

@@ -1,4 +1,5 @@
 import type { ObjectId } from "mongodb";
+import type { PillarNoteFieldDef, PillarNoteFieldValues } from "../pillar-note-fields";
 import type { RecurringKind, RecurringProgress } from "../recurring-week";
 import type { MissionLayout } from "../mission-layout";
 
@@ -6,6 +7,11 @@ export type MongoPillar = {
   tursoId: number;
   name: string;
   description: string | null;
+  /** Quick scheduling reminders shown on the pillar calendar (e.g. "Mondays: deep work"). */
+  calendarNote: string | null;
+  /** Pillar-specific structured fields shown under the planning note (e.g. Theme, Style). */
+  noteFields: PillarNoteFieldDef[];
+  noteFieldValues: PillarNoteFieldValues;
   color: string;
   abbreviation: string | null;
   rank: number;
@@ -86,6 +92,8 @@ export type MongoTask = {
   recurringWeekMonday: string | null;
   recurringSlot: string | null;
   isNew: boolean;
+  /** Undated capture — excluded from calendar and mission prioritization until scheduled. */
+  isIdea: boolean;
   dateLocked: boolean;
   completedAt: Date | null;
   createdAt: Date;
@@ -104,6 +112,8 @@ export type MongoRoutine = {
   dailyDays: boolean[];
   tallyEnabled: boolean;
   spawnTaskCards: boolean;
+  /** Last calendar day for spawned tasks — null means ongoing (4-week rolling horizon). */
+  endDate: string | null;
   active: boolean;
   rank: number;
   rules: string | null;

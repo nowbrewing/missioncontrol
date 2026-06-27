@@ -2,6 +2,15 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import ChatMarkdown from "../ChatMarkdown";
+import CorrectionReviewModal from "../correction/CorrectionReviewModal";
+import {
+  applyProposedCorrections,
+  loadCorrectionKickoff,
+  proposeCorrectionsFromMessages,
+  sendCorrectionChatMessage,
+} from "../../lib/chat-correction-skill";
+import { parseChatSlashCommand } from "../../lib/chat-mode";
+import type { ProposedCorrection } from "../../lib/adk/propose-corrections";
 import { todayIsoYyyyMmDd } from "../../lib/date";
 
 type ReflectionMessage = {
@@ -17,6 +26,8 @@ type ReflectionContext = {
   kickoff: string;
 };
 
+type ReflectionSkill = "reflection" | "correction";
+
 export default function Reflection() {
   const [planDate] = useState(() => todayIsoYyyyMmDd());
   const [weekContext, setWeekContext] = useState<ReflectionContext | null>(null);
@@ -30,6 +41,14 @@ export default function Reflection() {
   const [saveOpen, setSaveOpen] = useState(false);
   const [saveSummary, setSaveSummary] = useState("");
   const [saveNotice, setSaveNotice] = useState<string | null>(null);
+  const [skill, setSkill] = useState<ReflectionSkill>("reflection");
+  const [correctionWeekLabel, setCorrectionWeekLabel] = useState<string | null>(null);
+  const [correctionProposing, setCorrectionProposing] = useState(false);
+  const [correctionReviewOpen, setCorrectionReviewOpen] = useState(false);
+  const [correctionProposals, setCorrectionProposals] = useState<ProposedCorrection[]>([]);
+  const [savingCorrections, setSavingCorrections] = useState(false);
+  const [correctionSaveError, setCorrectionSaveError] = useState<string | null>(null);
+  const correctionStartRef = useRef<number | null>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const formRef = useRef<HTMLFormElement>(null);
 
@@ -76,11 +95,73 @@ export default function Reflection() {
     formRef.current?.requestSubmit();
   };
 
+  async function enterCorrectionSkill() {
+    correctionStartRef.current = messages.length;
+    setSkill("correction");
+    const ctx = await loadCorrectionKickoff(planDate);
+    setCorrectionWeekLabel(ctx.week_label);
+    setMessages((prev) => [
+      ...prev,
+      {
+        id: `assistant-correction-kickoff-${Date.now()}`,
+        role: "assistant",
+        content: ctx.kickoff,
+      },
+    ]);
+  }
+
+  function exitCorrectionSkill() {
+    correctionStartRef.current = null;
+    setCorrectionWeekLabel(null);
+    setSkill("reflection");
+  }
+
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
-    const text = input.trim();
-    if (!text || busy || summarizing || saving || !weekContext) return;
+    const raw = input.trim();
+    if (!raw || busy || summarizing || saving || correctionProposing || !weekContext) return;
 
+    let message = raw;
+    let activeSkill = skill;
+
+    if (skill === "correction" && /^\/reflection\b/i.test(raw)) {
+      setInput("");
+      exitCorrectionSkill();
+      activeSkill = "reflection";
+      message = raw.replace(/^\/reflection\b/i, "").trim();
+      if (!message) return;
+    } else {
+      const { modeSwitch, message: parsedMessage, navigate } = parseChatSlashCommand(raw);
+      if (navigate) {
+        setInput("");
+        return;
+      }
+      message = parsedMessage;
+
+      if (modeSwitch === "correction") {
+        setInput("");
+        if (skill !== "correction") {
+          try {
+            await enterCorrectionSkill();
+          } catch (err) {
+            setError(err instanceof Error ? err.message : "Could not start correction");
+            return;
+          }
+        }
+        activeSkill = "correction";
+        if (!message) return;
+      } else if (modeSwitch === "copilot") {
+        setInput("");
+        if (skill === "correction") exitCorrectionSkill();
+        activeSkill = "reflection";
+        if (!message) return;
+      } else if (modeSwitch) {
+        setInput("");
+        return;
+      }
+    }
+
+    const text = message;
     const userMessage: ReflectionMessage = {
       id: `user-${Date.now()}`,
       role: "user",
@@ -92,6 +173,20 @@ export default function Reflection() {
     setError(null);
 
     try {
+      if (activeSkill === "correction") {
+        const start = correctionStartRef.current ?? 0;
+        const history = messages.slice(start).map((m) => ({
+          role: m.role,
+          content: m.content,
+        }));
+        const reply = await sendCorrectionChatMessage(planDate, text, history);
+        setMessages((prev) => [
+          ...prev,
+          { id: `assistant-${Date.now()}`, role: "assistant", content: reply },
+        ]);
+        return;
+      }
+
       const res = await fetch("/api/reflection/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -155,14 +250,62 @@ export default function Reflection() {
   }
 
   function clearSession() {
-    if (busy || summarizing || saving) return;
+    if (busy || summarizing || saving || correctionProposing) return;
     if (messages.length > 1 && !window.confirm("Start over? Your conversation will be cleared.")) {
       return;
     }
+    exitCorrectionSkill();
     void loadContext();
     setSaveNotice(null);
     setSaveOpen(false);
   }
+
+  async function openCorrectionProposeFlow() {
+    const start = correctionStartRef.current ?? 0;
+    const segment = messages.slice(start).map((m) => ({
+      role: m.role,
+      content: m.content,
+    }));
+    if (!segment.some((m) => m.role === "user")) return;
+
+    setCorrectionProposing(true);
+    setError(null);
+    try {
+      const rows = await proposeCorrectionsFromMessages(planDate, segment);
+      if (rows.length === 0) {
+        setError("No matching records to update — try being more specific about what to fix.");
+        return;
+      }
+      setCorrectionProposals(rows);
+      setCorrectionSaveError(null);
+      setCorrectionReviewOpen(true);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Propose failed");
+    } finally {
+      setCorrectionProposing(false);
+    }
+  }
+
+  async function confirmCorrectionApply(corrections: ProposedCorrection[]) {
+    setSavingCorrections(true);
+    setCorrectionSaveError(null);
+    try {
+      const saved = await applyProposedCorrections(corrections);
+      setCorrectionReviewOpen(false);
+      setCorrectionProposals([]);
+      setSaveNotice(`Updated ${saved} record${saved === 1 ? "" : "s"}`);
+      window.setTimeout(() => setSaveNotice(null), 5000);
+    } catch (err) {
+      setCorrectionSaveError(err instanceof Error ? err.message : "Apply failed");
+    } finally {
+      setSavingCorrections(false);
+    }
+  }
+
+  const hasUserReply = messages.some((m) => m.role === "user");
+  const correctionHasUserReply =
+    skill === "correction" &&
+    messages.slice(correctionStartRef.current ?? 0).some((m) => m.role === "user");
 
   async function confirmSave() {
     if (!weekContext || !saveSummary.trim()) return;
@@ -195,15 +338,25 @@ export default function Reflection() {
     }
   }
 
-  const hasUserReply = messages.some((m) => m.role === "user");
-
   return (
     <div className="thinkpadLayout">
       <div className="thinkpadToolbar">
         <p className="thinkpadToolbarHint">
-          {weekContext ? (
+          {skill === "correction" ? (
             <>
-              Reviewing week of <strong>{weekContext.week_label}</strong>
+              Correction
+              {correctionWeekLabel ? (
+                <>
+                  {" "}
+                  for <strong>{correctionWeekLabel}</strong>
+                </>
+              ) : null}
+              — type <code className="chatModeHintCode">/reflection</code> to return.
+            </>
+          ) : weekContext ? (
+            <>
+              Reviewing week of <strong>{weekContext.week_label}</strong> — type{" "}
+              <code className="chatModeHintCode">/correction</code> to fix recorded context.
             </>
           ) : (
             "Loading your week…"
@@ -215,24 +368,43 @@ export default function Reflection() {
               {saveNotice}
             </span>
           )}
+          {skill === "correction" && (
+            <button
+              type="button"
+              className="thinkpadToolbarBtn thinkpadToolbarBtnPrimary"
+              onClick={() => void openCorrectionProposeFlow()}
+              disabled={loading || busy || correctionProposing || !correctionHasUserReply}
+            >
+              {correctionProposing ? "Finding records…" : "Apply corrections"}
+            </button>
+          )}
           <button
             type="button"
             className="thinkpadToolbarBtn"
             onClick={clearSession}
-            disabled={loading || busy || summarizing || saving || messages.length <= 1}
+            disabled={
+              loading ||
+              busy ||
+              summarizing ||
+              saving ||
+              correctionProposing ||
+              messages.length <= 1
+            }
           >
             Start over
           </button>
-          <button
-            type="button"
-            className="thinkpadToolbarBtn thinkpadToolbarBtnPrimary"
-            onClick={() => void openSaveFlow()}
-            disabled={
-              loading || busy || summarizing || saving || !hasUserReply
-            }
-          >
-            {summarizing ? "Summarizing…" : "Save reflection"}
-          </button>
+          {skill !== "correction" && (
+            <button
+              type="button"
+              className="thinkpadToolbarBtn thinkpadToolbarBtnPrimary"
+              onClick={() => void openSaveFlow()}
+              disabled={
+                loading || busy || summarizing || saving || !hasUserReply
+              }
+            >
+              {summarizing ? "Summarizing…" : "Save reflection"}
+            </button>
+          )}
         </div>
       </div>
 
@@ -277,13 +449,27 @@ export default function Reflection() {
           value={input}
           onChange={(e) => setInput(e.target.value)}
           onKeyDown={handleInputKeyDown}
-          placeholder="Share your thoughts — wins, misses, focus areas…"
-          disabled={loading || busy || summarizing || saving || !weekContext}
+          placeholder={
+            skill === "correction"
+              ? "What was recorded wrong or too vague?"
+              : "Share your thoughts — wins, misses, focus areas… (/correction)"
+          }
+          disabled={
+            loading || busy || summarizing || saving || correctionProposing || !weekContext
+          }
         />
         <button
           className="chatSendBtn"
           type="submit"
-          disabled={loading || busy || summarizing || saving || !input.trim() || !weekContext}
+          disabled={
+            loading ||
+            busy ||
+            summarizing ||
+            saving ||
+            correctionProposing ||
+            !input.trim() ||
+            !weekContext
+          }
         >
           {busy ? "..." : "Send"}
         </button>
@@ -332,6 +518,19 @@ export default function Reflection() {
             </div>
           </div>
         </div>
+      )}
+      {correctionReviewOpen && (
+        <CorrectionReviewModal
+          corrections={correctionProposals}
+          saving={savingCorrections}
+          saveError={correctionSaveError}
+          onConfirm={(rows) => void confirmCorrectionApply(rows)}
+          onDismiss={() => {
+            if (savingCorrections) return;
+            setCorrectionReviewOpen(false);
+            setCorrectionSaveError(null);
+          }}
+        />
       )}
     </div>
   );

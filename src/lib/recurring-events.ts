@@ -1,4 +1,8 @@
-import { addDaysIsoYyyyMmDd, todayIsoYyyyMmDd } from "./date";
+import { addDaysIsoYyyyMmDd, isYyyyMmDd, todayIsoYyyyMmDd } from "./date";
+import {
+  habitCalendarHorizonEnd,
+  weekMondaysThrough,
+} from "./habit-calendar-horizon";
 import { resolvePillarAbbreviation } from "./pillar-abbreviation";
 import { isRunTask } from "./workout-schedule";
 import {
@@ -8,6 +12,7 @@ import {
   emptyProgress,
   parseDailyDays,
   parseProgress,
+  selectedDayIndices,
   serializeDailyDays,
   weekDatesFromMonday,
   weekMondayFor,
@@ -25,10 +30,13 @@ import {
   insertTask,
   listTasksByRecurring,
   normalizeRecurringTaskSchedules,
+  deleteRecurringTasksForEvent,
+  pruneOpenRecurringTasksAfterDate,
   updateTask,
 } from "./mongodb/store/tasks";
 import {
   getOrCreateRoutineProgress,
+  findRoutine,
   listActiveRoutines,
   markRoutineTasksSpawned,
   updateRoutineProgress,
@@ -47,6 +55,7 @@ export type RecurringEventRow = {
   pillar_id: number | null;
   milestone_id: number | null;
   spawn_task_cards: number;
+  end_date: string | null;
   active: number;
   rank: number;
   created_at: string;
@@ -85,6 +94,7 @@ function routineToEventRow(r: MongoRoutine): RecurringEventRow {
     pillar_id: r.pillarId,
     milestone_id: r.milestoneId,
     spawn_task_cards: r.spawnTaskCards ? 1 : 0,
+    end_date: r.endDate ?? null,
     active: r.active ? 1 : 0,
     rank: r.rank,
     created_at: r.createdAt.toISOString().replace("T", " ").slice(0, 19),
@@ -104,7 +114,9 @@ async function spawnWeeklyTasks(
   userId: number,
   event: RecurringEventRow,
   weekMonday: string,
-  progressId: number
+  progressId: number,
+  horizonEnd: string,
+  minDate?: string
 ) {
   const weekDates = weekDatesFromMonday(weekMonday);
   const dailyDays = parseDailyDays(event.daily_days);
@@ -112,23 +124,34 @@ async function spawnWeeklyTasks(
   const tally = !!event.tally_enabled;
 
   let nextRank = (await getMaxTaskRank(userId)) + 1;
+  let spawned = false;
+
+  function includeDate(date: string): boolean {
+    if (date > horizonEnd) return false;
+    if (minDate && date < minDate) return false;
+    return true;
+  }
 
   if (event.kind === "daily" && tally) {
-    await insertTask(userId, {
-      title: event.title,
-      description: tallyTaskDescription(0, event.target_count),
-      deadline: end,
-      rank: nextRank++,
-      pillarId: event.pillar_id,
-      milestoneId: event.milestone_id,
-      scheduleType: "window",
-      recurringEventId: event.id,
-      recurringWeekMonday: weekMonday,
-      recurringSlot: "tally",
-    });
+    if (includeDate(end)) {
+      await insertTask(userId, {
+        title: event.title,
+        description: tallyTaskDescription(0, event.target_count),
+        deadline: end,
+        rank: nextRank++,
+        pillarId: event.pillar_id,
+        milestoneId: event.milestone_id,
+        scheduleType: "window",
+        recurringEventId: event.id,
+        recurringWeekMonday: weekMonday,
+        recurringSlot: "tally",
+      });
+      spawned = true;
+    }
   } else if (event.kind === "daily") {
     for (let i = 0; i < 7; i++) {
       if (!dailyDays[i]) continue;
+      if (!includeDate(weekDates[i])) continue;
       await insertTask(userId, {
         title: event.title,
         deadline: weekDates[i],
@@ -140,21 +163,33 @@ async function spawnWeeklyTasks(
         recurringWeekMonday: weekMonday,
         recurringSlot: weekDates[i],
       });
+      spawned = true;
     }
   } else if (event.kind === "count") {
-    const occupied = new Set<string>();
+    const dayIndices = selectedDayIndices(dailyDays);
+    const useCalendarDays = dayIndices.length > 0;
+
     for (let i = 0; i < event.target_count; i++) {
-      let deadline = addDaysIsoYyyyMmDd(weekMonday, i);
-      if (isRunTask(event.title)) {
-        while (occupied.has(deadline) && deadline <= end) {
-          deadline = addDaysIsoYyyyMmDd(deadline, 1);
-        }
-        occupied.add(deadline);
+      let deadline: string;
+
+      if (useCalendarDays && dayIndices[i] !== undefined) {
+        deadline = weekDates[dayIndices[i]];
       } else {
-        const step = Math.max(1, Math.floor(7 / event.target_count));
-        deadline = addDaysIsoYyyyMmDd(weekMonday, Math.min(i * step, 6));
+        const occupied = new Set<string>();
+        deadline = addDaysIsoYyyyMmDd(weekMonday, i);
+        if (isRunTask(event.title)) {
+          while (occupied.has(deadline) && deadline <= end) {
+            deadline = addDaysIsoYyyyMmDd(deadline, 1);
+          }
+          occupied.add(deadline);
+        } else {
+          const step = Math.max(1, Math.floor(7 / event.target_count));
+          deadline = addDaysIsoYyyyMmDd(weekMonday, Math.min(i * step, 6));
+        }
+        if (deadline > end) deadline = end;
       }
-      if (deadline > end) deadline = end;
+
+      if (!includeDate(deadline)) continue;
 
       await insertTask(userId, {
         title: `${event.title} (${i + 1}/${event.target_count})`,
@@ -167,10 +202,108 @@ async function spawnWeeklyTasks(
         recurringWeekMonday: weekMonday,
         recurringSlot: String(i),
       });
+      spawned = true;
     }
   }
 
-  await markRoutineTasksSpawned(userId, progressId);
+  if (spawned) {
+    await markRoutineTasksSpawned(userId, progressId);
+  }
+}
+
+async function ensureRoutineCalendarTasks(
+  userId: number,
+  event: MongoRoutine,
+  today: string,
+  fromDate?: string
+) {
+  if (!event.spawnTaskCards) return;
+
+  const horizonEnd = habitCalendarHorizonEnd(today, event.endDate ?? null);
+  const spawnFrom = fromDate && fromDate > today ? fromDate : today;
+  if (horizonEnd < spawnFrom) return;
+
+  const row = routineToEventRow(event);
+  const tallyEnabled = !!event.tallyEnabled;
+  const startMonday = weekMondayFor(spawnFrom);
+
+  for (const weekMonday of weekMondaysThrough(startMonday, horizonEnd)) {
+    const pr = await getOrCreateRoutineProgress(
+      userId,
+      event.tursoId,
+      weekMonday,
+      event.kind,
+      event.targetFrequency,
+      tallyEnabled
+    );
+
+    if (!pr.tasks_spawned) {
+      await spawnWeeklyTasks(
+        userId,
+        row,
+        weekMonday,
+        pr.progress_id,
+        horizonEnd,
+        fromDate
+      );
+    }
+  }
+}
+
+export async function ensureHabitCalendarTasks(userId: number, today = todayIsoYyyyMmDd()) {
+  const events = await listActiveRoutines(userId);
+  for (const event of events) {
+    await ensureRoutineCalendarTasks(userId, event, today);
+  }
+}
+
+export async function pruneRecurringTasksAfterEndDate(
+  userId: number,
+  eventId: number,
+  endDate: string | null
+) {
+  if (!endDate) return;
+  await pruneOpenRecurringTasksAfterDate(userId, eventId, endDate);
+}
+
+/** Drop open calendar tasks from today onward and allow respawn after schedule changes. */
+export async function resetFutureRoutineCalendarTasks(
+  userId: number,
+  eventId: number,
+  today = todayIsoYyyyMmDd()
+) {
+  await pruneOpenRecurringTasksAfterDate(userId, eventId, addDaysIsoYyyyMmDd(today, -1));
+
+  const db = await getMongoDb();
+  const weekMonday = weekMondayFor(today);
+  await db.collection(COLLECTIONS.routine_progress).updateMany(
+    { tursoUserId: userId, routineId: eventId, weekMonday: { $gte: weekMonday } },
+    { $set: { tasksSpawned: false, updatedAt: new Date() } }
+  );
+}
+
+/** Remove all habit calendar tasks and respawn from a start date with current schedule. */
+export async function regenerateHabitCalendarTasks(
+  userId: number,
+  eventId: number,
+  fromDate: string,
+  today = todayIsoYyyyMmDd()
+) {
+  if (!isYyyyMmDd(fromDate)) throw new Error("Invalid from_date");
+
+  const routine = await findRoutine(userId, eventId);
+  if (!routine?.spawnTaskCards) return;
+
+  await deleteRecurringTasksForEvent(userId, eventId);
+
+  const db = await getMongoDb();
+  const startMonday = weekMondayFor(fromDate);
+  await db.collection(COLLECTIONS.routine_progress).updateMany(
+    { tursoUserId: userId, routineId: eventId, weekMonday: { $gte: startMonday } },
+    { $set: { tasksSpawned: false, updatedAt: new Date() } }
+  );
+
+  await ensureRoutineCalendarTasks(userId, routine, today, fromDate);
 }
 
 export async function ensureRecurringWeek(
@@ -178,6 +311,7 @@ export async function ensureRecurringWeek(
   today = todayIsoYyyyMmDd()
 ): Promise<{ week_monday: string; items: RecurringWeekItem[] }> {
   await normalizeRecurringTaskSchedules(userId);
+  await ensureHabitCalendarTasks(userId, today);
   const weekMonday = weekMondayFor(today);
   const weekDates = weekDatesFromMonday(weekMonday);
 
@@ -193,7 +327,6 @@ export async function ensureRecurringWeek(
   const items: RecurringWeekItem[] = [];
 
   for (const event of events) {
-    const row = routineToEventRow(event);
     const tallyEnabled = !!event.tallyEnabled;
 
     const pr = await getOrCreateRoutineProgress(
@@ -204,10 +337,6 @@ export async function ensureRecurringWeek(
       event.targetFrequency,
       tallyEnabled
     );
-
-    if (event.spawnTaskCards && !pr.tasks_spawned) {
-      await spawnWeeklyTasks(userId, row, weekMonday, pr.progress_id);
-    }
 
     const pillar = event.pillarId ? pillarById.get(event.pillarId) : null;
     const milestone = event.milestoneId ? milestoneById.get(event.milestoneId) : null;

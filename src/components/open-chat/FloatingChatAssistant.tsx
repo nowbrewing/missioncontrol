@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useOpenChat } from "./OpenChatProvider";
 import OpenChatPanel from "./OpenChatPanel";
 
@@ -15,32 +15,50 @@ export default function FloatingChatAssistant() {
     handoffBusy,
   } = useOpenChat();
   const panelRef = useRef<HTMLDivElement>(null);
+  const [expanded, setExpanded] = useState(false);
+
+  useEffect(() => {
+    if (!floatingOpen) setExpanded(false);
+  }, [floatingOpen]);
 
   useEffect(() => {
     if (!floatingOpen) return;
 
     function onKeyDown(e: KeyboardEvent) {
-      if (e.key === "Escape") closeFloatingChat();
+      if (e.key === "Escape") {
+        if (expanded) {
+          setExpanded(false);
+        } else {
+          closeFloatingChat();
+        }
+      }
     }
 
     document.addEventListener("keydown", onKeyDown);
     return () => document.removeEventListener("keydown", onKeyDown);
-  }, [floatingOpen, closeFloatingChat]);
+  }, [floatingOpen, closeFloatingChat, expanded]);
+
+  function handleClose() {
+    setExpanded(false);
+    closeFloatingChat();
+  }
 
   return (
     <>
-      {floatingOpen && (
+      {floatingOpen && !expanded && (
         <button
           type="button"
           className="floatingChatBackdrop"
           aria-label="Close chat"
-          onClick={closeFloatingChat}
+          onClick={handleClose}
         />
       )}
 
       <div
         ref={panelRef}
-        className={`floatingChatPanel ${floatingOpen ? "floatingChatPanelOpen" : ""}`}
+        className={`floatingChatPanel ${floatingOpen ? "floatingChatPanelOpen" : ""} ${
+          expanded ? "floatingChatPanelExpanded" : ""
+        }`}
         role="dialog"
         aria-label="Co-pilot chat"
         aria-hidden={!floatingOpen}
@@ -48,7 +66,11 @@ export default function FloatingChatAssistant() {
         <header className="floatingChatPanelHeader">
           <div className="floatingChatPanelTitleWrap">
             <h2 className="floatingChatPanelTitle">
-              {chatMode === "general" ? "General chat" : "Co-pilot"}
+              {chatMode === "correction"
+                ? "Correction"
+                : chatMode === "general"
+                  ? "General chat"
+                  : "Co-pilot"}
             </h2>
             {summarizingSession && (
               <span className="missionChatSessionStatus">Finding notes…</span>
@@ -62,15 +84,26 @@ export default function FloatingChatAssistant() {
               </span>
             )}
           </div>
-          <button
-            type="button"
-            className="floatingChatCloseBtn"
-            onClick={closeFloatingChat}
-            aria-label="Close chat"
-            disabled={summarizingSession || handoffBusy}
-          >
-            ×
-          </button>
+          <div className="floatingChatPanelHeaderActions">
+            <button
+              type="button"
+              className="floatingChatExpandBtn"
+              onClick={() => setExpanded((v) => !v)}
+              aria-label={expanded ? "Exit full screen" : "Full screen"}
+              disabled={summarizingSession || handoffBusy}
+            >
+              {expanded ? "Shrink" : "Expand"}
+            </button>
+            <button
+              type="button"
+              className="floatingChatCloseBtn"
+              onClick={handleClose}
+              aria-label="Close chat"
+              disabled={summarizingSession || handoffBusy}
+            >
+              ×
+            </button>
+          </div>
         </header>
         <div className="floatingChatPanelBody">
           <OpenChatPanel variant="floating" />

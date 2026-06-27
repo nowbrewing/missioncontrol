@@ -51,6 +51,24 @@ export function serializeDailyDays(days: DailyDaysMask): string {
   return JSON.stringify(days);
 }
 
+export function countSelectedDays(days: DailyDaysMask): number {
+  return days.filter(Boolean).length;
+}
+
+export function selectedDayIndices(days: DailyDaysMask): number[] {
+  return days.map((on, i) => (on ? i : -1)).filter((i) => i >= 0);
+}
+
+/** Spread N sessions across the week (Mon → Sun priority). */
+export function defaultCalendarDaysForCount(count: number): DailyDaysMask {
+  const preferred = [0, 2, 4, 1, 3, 5, 6];
+  const days: DailyDaysMask = [false, false, false, false, false, false, false];
+  for (let i = 0; i < Math.min(count, 7); i++) {
+    days[preferred[i]] = true;
+  }
+  return days;
+}
+
 export function emptyProgress(
   kind: RecurringKind,
   targetCount: number,

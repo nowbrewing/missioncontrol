@@ -23,6 +23,11 @@ export default function OpenChatPanel({
     handoffBusy,
     chatError,
     summarizingSession,
+    sessionSaveNotice,
+    correctionWeekLabel,
+    correctionProposing,
+    correctionHasUserReply,
+    openCorrectionProposeFlow,
     onChatSubmit,
   } = useOpenChat();
   const inputRef = useRef<HTMLTextAreaElement>(null);
@@ -65,6 +70,7 @@ export default function OpenChatPanel({
   const inputClass =
     variant === "floating" ? "chatInput floatingChatInput" : "chatInput missionChatInput";
   const isGeneral = chatMode === "general";
+  const isCorrection = chatMode === "correction";
 
   return (
     <>
@@ -72,12 +78,25 @@ export default function OpenChatPanel({
         <p
           className="missionChatHeroSubtext"
           title={
-            isGeneral
-              ? "Plain model with a brief life snapshot — no co-pilot persona. Type /copilot to switch back."
-              : "Open conversation — think out loud, reflect, or go deep on a pillar. Type /general for plain model access."
+            isCorrection
+              ? "Fix recorded context — type /copilot to return to co-pilot."
+              : isGeneral
+                ? "Plain model with a brief life snapshot — no co-pilot persona. Type /copilot to switch back."
+                : "Open conversation — think out loud, reflect, or go deep on a pillar. Type /general for plain model access."
           }
         >
-          {isGeneral ? (
+          {isCorrection ? (
+            <>
+              Fixing what was recorded wrong or too vague
+              {correctionWeekLabel ? (
+                <>
+                  {" "}
+                  for <strong>{correctionWeekLabel}</strong>
+                </>
+              ) : null}
+              . Type <code className="chatModeHintCode">/copilot</code> when you&apos;re done.
+            </>
+          ) : isGeneral ? (
             <>
               Plain model with your pillars and top-of-mind snapshot — no co-pilot persona. Type{" "}
               <code className="chatModeHintCode">/copilot</code> to switch back; the co-pilot
@@ -85,9 +104,12 @@ export default function OpenChatPanel({
             </>
           ) : (
             <>
-              Think out loud or go deep on a pillar — ask to add or edit tasks and you&apos;ll
-              review before anything saves. Type{" "}
-              <code className="chatModeHintCode">/general</code> for plain model access.
+              Think out loud or go deep on a pillar — the Life Agent routes to skills when needed. Type{" "}
+              <code className="chatModeHintCode">/general</code>,{" "}
+              <code className="chatModeHintCode">/life-pillar</code>,{" "}
+              <code className="chatModeHintCode">/create-task</code>,{" "}
+              <code className="chatModeHintCode">/edit-task</code>, or{" "}
+              <code className="chatModeHintCode">/correction</code>.
             </>
           )}
         </p>
@@ -95,26 +117,53 @@ export default function OpenChatPanel({
 
       {showSubtext && variant === "floating" && (
         <p className="floatingChatSubtext">
-          {isGeneral ? (
+          {isCorrection ? (
+            <>
+              Correction mode — type <code className="chatModeHintCode">/copilot</code> to return.
+            </>
+          ) : isGeneral ? (
             <>
               Plain model + life snapshot — type <code className="chatModeHintCode">/copilot</code>{" "}
               to switch back; the co-pilot reviews and keeps only what&apos;s relevant.
             </>
           ) : (
             <>
-              Ask anything — or type <code className="chatModeHintCode">/general</code> for plain
-              model access.
+              Ask anything — Life Agent routes skills via slash commands.
             </>
           )}
         </p>
       )}
 
+      {(isCorrection || sessionSaveNotice) && (
+        <div className="thinkpadToolbar missionChatCorrectionBar">
+          {sessionSaveNotice && (
+            <span className="missionChatSessionStatus missionChatSessionSaved">
+              {sessionSaveNotice}
+            </span>
+          )}
+          {isCorrection && (
+            <button
+              type="button"
+              className="thinkpadToolbarBtn thinkpadToolbarBtnPrimary"
+              onClick={() => void openCorrectionProposeFlow()}
+              disabled={
+                chatBusy || handoffBusy || correctionProposing || !correctionHasUserReply
+              }
+            >
+              {correctionProposing ? "Finding records…" : "Apply corrections"}
+            </button>
+          )}
+        </div>
+      )}
+
       <div className={messagesClass} aria-live="polite">
         {chatMessages.length === 0 && (
           <p className={variant === "floating" ? "floatingChatEmptyHint" : "missionChatEmptyHint"}>
-            {isGeneral
-              ? "Ask anything — plain model with a brief pillars & top-of-mind snapshot."
-              : 'e.g. "I\'ve been spinning on the hackathon pitch — help me untangle what actually matters"'}
+            {isCorrection
+              ? "What was recorded wrong or too vague?"
+              : isGeneral
+                ? "Ask anything — plain model with a brief pillars & top-of-mind snapshot."
+                : 'e.g. "I\'ve been spinning on the hackathon pitch — help me untangle what actually matters"'}
           </p>
         )}
         {chatMessages.map((message) => {
@@ -153,6 +202,11 @@ export default function OpenChatPanel({
 
       <form ref={formRef} className={formClass} onSubmit={onChatSubmit}>
         <div className="chatFormInputRow">
+          {isCorrection && (
+            <span className="chatModeBadge" title="Fix recorded logs, notes, and pillar context">
+              Correction
+            </span>
+          )}
           {isGeneral && (
             <span className="chatModeBadge" title="Plain model with life snapshot — no co-pilot persona">
               General
@@ -166,17 +220,25 @@ export default function OpenChatPanel({
             onChange={(e) => setChatInput(e.target.value)}
             onKeyDown={handleInputKeyDown}
             placeholder={
-              isGeneral
-                ? "Ask anything (plain model + life snapshot)…"
-                : "What's on your mind? (/general for plain model)"
+              isCorrection
+                ? "What was recorded wrong or too vague?"
+                : isGeneral
+                  ? "Ask anything (plain model + life snapshot)…"
+                  : "What's on your mind? (/general, /life-pillar, /create-task…)"
             }
-            disabled={chatBusy || handoffBusy || summarizingSession}
+            disabled={chatBusy || handoffBusy || summarizingSession || correctionProposing}
           />
         </div>
         <button
           className="chatSendBtn"
           type="submit"
-          disabled={chatBusy || handoffBusy || summarizingSession || !chatInput.trim()}
+          disabled={
+            chatBusy ||
+            handoffBusy ||
+            summarizingSession ||
+            correctionProposing ||
+            !chatInput.trim()
+          }
         >
           {chatBusy || handoffBusy ? "..." : "Send"}
         </button>

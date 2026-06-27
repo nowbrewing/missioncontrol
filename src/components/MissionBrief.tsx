@@ -23,6 +23,7 @@ import {
 import { CSS } from "@dnd-kit/utilities";
 import { useCallback, useEffect, useState, type ReactNode } from "react";
 import PillarChip from "./PillarChip";
+import ActionIconButton, { DeleteIcon } from "./ActionIconButton";
 import TaskCardMeta from "./TaskCardMeta";
 import TaskDateLockToggle from "./TaskDateLockToggle";
 import TaskDeadlineEditor from "./TaskDeadlineEditor";
@@ -267,18 +268,18 @@ function SortableBoardRow({
                   taskTitle={item.title}
                   onChange={(note) => onNoteChange(item.id, note)}
                 />
-                <button
-                  type="button"
-                  className="rankBtn boardDeleteBtn"
+                <ActionIconButton
+                  label={`Delete task: ${item.title}`}
                   onClick={() => {
                     if (window.confirm(`Delete "${item.title}"? This cannot be undone.`)) {
                       onDeleteTask(item.id);
                     }
                   }}
-                  aria-label={`Delete task: ${item.title}`}
+                  variant="danger"
+                  className="boardDeleteBtn"
                 >
-                  ×
-                </button>
+                  <DeleteIcon />
+                </ActionIconButton>
               </div>
             </div>
           </>

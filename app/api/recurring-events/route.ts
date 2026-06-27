@@ -1,9 +1,13 @@
 import { NextResponse } from "next/server";
 import { requireSessionUser } from "../../../src/lib/auth";
+import { isYyyyMmDd } from "../../../src/lib/date";
 import {
   DEFAULT_DAILY_DAYS,
   type RecurringKind,
 } from "../../../src/lib/recurring-week";
+import {
+  ensureHabitCalendarTasks,
+} from "../../../src/lib/recurring-events";
 import {
   getMaxRoutineRank,
   insertRoutine,
@@ -11,6 +15,12 @@ import {
 } from "../../../src/lib/mongodb/store/routines";
 
 const KINDS: RecurringKind[] = ["daily", "count"];
+
+function parseEndDate(raw: unknown): string | null {
+  if (raw == null || raw === "") return null;
+  if (typeof raw !== "string" || !isYyyyMmDd(raw)) return null;
+  return raw;
+}
 
 export const GET = async () => {
   try {
@@ -36,12 +46,19 @@ export const POST = async (req: Request) => {
       pillar_id?: number | null;
       milestone_id?: number | null;
       spawn_task_cards?: boolean;
+      end_date?: string | null;
       rules?: string | null;
     };
 
     const title = body.title?.trim();
     if (!title) {
       return NextResponse.json({ ok: false, error: "Title is required" }, { status: 400 });
+    }
+
+    if (body.end_date !== undefined && body.end_date !== null && body.end_date !== "") {
+      if (!isYyyyMmDd(body.end_date)) {
+        return NextResponse.json({ ok: false, error: "Invalid end_date" }, { status: 400 });
+      }
     }
 
     const kind = body.kind && KINDS.includes(body.kind) ? body.kind : "daily";
@@ -72,6 +89,7 @@ export const POST = async (req: Request) => {
         : DEFAULT_DAILY_DAYS;
 
     const rank = (await getMaxRoutineRank(user.id)) + 1;
+    const endDate = body.end_date !== undefined ? parseEndDate(body.end_date) : null;
 
     const event = await insertRoutine(user.id, {
       title,
@@ -82,9 +100,14 @@ export const POST = async (req: Request) => {
       pillarId: body.pillar_id ?? null,
       milestoneId: body.milestone_id ?? null,
       spawnTaskCards: !!body.spawn_task_cards,
+      endDate,
       rank,
       rules: body.rules?.trim() || null,
     });
+
+    if (event.spawn_task_cards) {
+      await ensureHabitCalendarTasks(user.id);
+    }
 
     return NextResponse.json({ ok: true, event });
   } catch (e: unknown) {

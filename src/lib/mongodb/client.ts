@@ -23,6 +23,11 @@ function getMongoUri() {
 
 function wrapMongoConnectError(error: unknown): Error {
   const msg = error instanceof Error ? error.message : String(error);
+  if (msg.includes("querySrv") && msg.includes("ECONNREFUSED")) {
+    return new Error(
+      "MongoDB DNS lookup failed (querySrv ECONNREFUSED). Your machine could not resolve the Atlas SRV record. Check: (1) internet connection, (2) MONGODB_URI in .env.local, (3) disable VPN or try DNS 1.1.1.1 / 8.8.8.8, (4) in Atlas use a standard mongodb:// connection string instead of mongodb+srv if SRV lookups are blocked on your network."
+    );
+  }
   if (
     msg.includes("SSL") ||
     msg.includes("tlsv1 alert internal error") ||

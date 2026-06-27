@@ -1,3 +1,4 @@
+import { isIdeaTask } from "./task-ideas";
 import { isYyyyMmDd, todayIsoYyyyMmDd } from "./date";
 import { computeLifeAdminStats, enrichTaskPillarDisplay } from "./life-admin";
 import { ensureLifeAdminSetup } from "./life-admin-setup";
@@ -36,7 +37,9 @@ export async function buildMissionBrief(userId: number, focusDate?: string) {
   const pillarRankById = new Map(pillars.map((p) => [Number(p.id), Number(p.rank)]));
   const milestoneById = new Map(milestones.map((m) => [Number(m.id), m]));
 
-  const enrichedTasks: MissionTask[] = tasks.map((t) => {
+  const enrichedTasks: MissionTask[] = tasks
+    .filter((t) => !isIdeaTask(t))
+    .map((t) => {
     const milestone = t.milestone_id ? milestoneById.get(Number(t.milestone_id)) : null;
     const pillarDisplay = enrichTaskPillarDisplay(
       t.pillar_id != null ? Number(t.pillar_id) : null,

@@ -88,9 +88,9 @@ export const PATCH = async (req: Request, { params }: Params) => {
       return NextResponse.json({ ok: false, error: "Nothing to update" }, { status: 400 });
     }
 
-    await updateTask(user.id, taskId, patch);
+    const task = await updateTask(user.id, taskId, patch);
 
-    return NextResponse.json({ ok: true });
+    return NextResponse.json({ ok: true, task });
   } catch (e: unknown) {
     const msg = e instanceof Error ? e.message : "Update failed";
     const status = msg === "Unauthorized" ? 401 : 500;

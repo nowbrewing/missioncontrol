@@ -35,6 +35,10 @@ export type OpenChatContextValue = {
   chatError: string | null;
   summarizingSession: boolean;
   sessionSaveNotice: string | null;
+  correctionWeekLabel: string | null;
+  correctionProposing: boolean;
+  correctionHasUserReply: boolean;
+  openCorrectionProposeFlow: () => Promise<void>;
   floatingOpen: boolean;
   openFloatingChat: () => void;
   closeFloatingChat: () => void;

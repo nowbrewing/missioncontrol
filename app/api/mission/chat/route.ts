@@ -1,13 +1,13 @@
 import { NextResponse } from "next/server";
-import { runGeneralChat } from "../../../../src/lib/adk/run-general-chat";
-import { runOpenChat } from "../../../../src/lib/adk/run-open-chat";
+import { runLifeAgentOrchestrator } from "../../../../src/lib/agent";
+import type { ForcedSkillId } from "../../../../src/lib/chat-mode";
 import type { LifeAgentMessage } from "../../../../src/lib/adk/run-life-agent";
 import { normalizeChatMode } from "../../../../src/lib/chat-mode";
 import { requireSessionUser } from "../../../../src/lib/auth";
 import { isYyyyMmDd, todayIsoYyyyMmDd } from "../../../../src/lib/date";
 
 export const runtime = "nodejs";
-export const maxDuration = 60;
+export const maxDuration = 120;
 
 export async function POST(req: Request) {
   try {
@@ -18,6 +18,7 @@ export async function POST(req: Request) {
       plan_date?: string;
       history?: LifeAgentMessage[];
       mode?: string;
+      forced_skill?: ForcedSkillId | null;
       general_handoff_summary?: string | null;
     };
 
@@ -39,21 +40,13 @@ export async function POST(req: Request) {
     );
 
     const mode = normalizeChatMode(body.mode);
-
-    if (mode === "general") {
-      const reply = await runGeneralChat({
-        userId: user.id,
-        planDate,
-        message,
-        history,
-      });
-      return NextResponse.json({
-        ok: true,
-        reply,
-        proposed_tasks: [],
-        task_edits: [],
-      });
-    }
+    const forcedSkill: ForcedSkillId | null =
+      body.forced_skill ??
+      (mode === "general"
+        ? "general"
+        : mode === "correction"
+          ? "correction"
+          : null);
 
     const handoffSummary =
       typeof body.general_handoff_summary === "string" &&
@@ -61,19 +54,22 @@ export async function POST(req: Request) {
         ? body.general_handoff_summary.trim()
         : null;
 
-    const result = await runOpenChat({
+    const result = await runLifeAgentOrchestrator({
       userId: user.id,
       planDate,
       message,
       history,
-      generalHandoffSummary: handoffSummary,
+      generalHandoffSummary: mode === "copilot" ? handoffSummary : null,
+      forcedSkill,
     });
 
     return NextResponse.json({
       ok: true,
       reply: result.reply,
-      proposed_tasks: result.proposedTasks,
-      task_edits: result.taskEdits,
+      routed: result.routed,
+      proposed_tasks: result.proposed_tasks,
+      task_edits: result.task_edits,
+      correction_proposals: result.correction_proposals,
     });
   } catch (e: unknown) {
     const msg = e instanceof Error ? e.message : "Chat failed";

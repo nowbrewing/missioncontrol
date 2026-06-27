@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import ActionIconButton, { DeleteIcon } from "./ActionIconButton";
 import TaskPillarSelect from "./TaskPillarSelect";
 import { isYyyyMmDd } from "../lib/date";
 
@@ -87,15 +88,15 @@ export default function TaskEditsReviewModal({
                 <div className="proposedTaskCardHead">
                   <span className="pill pillSubtle">Edit</span>
                   <span className="pill pillSubtle">id {edit.task_id}</span>
-                  <button
-                    type="button"
-                    className="rankBtn proposedTaskRemoveBtn"
+                  <ActionIconButton
+                    label={`Remove edit for ${edit.originalTitle}`}
                     onClick={() => removeEdit(edit.localId)}
                     disabled={saving}
-                    aria-label={`Remove edit for ${edit.originalTitle}`}
+                    variant="danger"
+                    className="proposedTaskRemoveBtn"
                   >
-                    ×
-                  </button>
+                    <DeleteIcon />
+                  </ActionIconButton>
                 </div>
 
                 {edit.titleChanged && (

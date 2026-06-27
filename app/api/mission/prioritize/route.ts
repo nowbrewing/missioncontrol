@@ -5,6 +5,7 @@ import { requireSessionUser } from "../../../../src/lib/auth";
 import { isYyyyMmDd, todayIsoYyyyMmDd } from "../../../../src/lib/date";
 import { applyOrchestrationLayout } from "../../../../src/lib/mission-apply-orchestration-layout";
 import { buildMissionBrief } from "../../../../src/lib/mission-brief";
+import { isIdeaTask } from "../../../../src/lib/task-ideas";
 import { listTasks } from "../../../../src/lib/mongodb/store/tasks";
 
 export const runtime = "nodejs";
@@ -27,7 +28,9 @@ export async function POST(req: Request) {
       mode: "prioritize",
     });
 
-    const openTasks = (await listTasks(user.id)).filter((t) => !t.completed_at);
+    const openTasks = (await listTasks(user.id)).filter(
+      (t) => !t.completed_at && !isIdeaTask(t)
+    );
     const taskRows = openTasks.map((t) => ({
       id: Number(t.id),
       deadline: t.deadline,

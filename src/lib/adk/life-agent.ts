@@ -7,6 +7,14 @@ import {
 } from "@google/adk";
 import { getMissionControlMcpConnectionParams } from "./mcp-connection";
 
+/**
+ * @deprecated Legacy ADK agent tree (sub-agents + MCP tools).
+ * Production chat uses `src/lib/agent/orchestrator/run-orchestrator.ts` —
+ * Life Agent routes to registered SKILLS (not sub-agents).
+ * Check-in/prioritize uses `runMissionOrchestration` (single-call synthesis).
+ * Kept for MCP experimentation and `runLifeAgent` if re-wired later.
+ */
+
 const LIFE_AGENT_INSTRUCTION = `Role and Persona
 You are the Life Agent, the central orchestrator of the user's Mission Control platform. You are a highly organized, empathetic, and proactive digital co-pilot. Your tone is supportive, concise, and action-oriented. You help the user balance their daily life, prevent burnout, and make steady progress across their custom-defined life "Pillars."
 

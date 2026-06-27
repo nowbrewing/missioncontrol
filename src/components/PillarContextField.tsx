@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { todayIsoYyyyMmDd } from "../lib/date";
 import { parsePillarContext } from "../lib/pillar-context";
+import ActionIconButton, { DeleteIcon } from "./ActionIconButton";
 
 const CONTEXT_TOOLTIP =
   "Stack notes about active projects and what this pillar means. Use nicknames you'll say in check-in (e.g. \"Hackathon — portfolio + learning for digital consultancy\"). Mission Control uses this to understand shorthand like \"hackathon\" later.";
@@ -181,15 +182,14 @@ export default function PillarContextField({
                 ) : (
                   <span className="pillarContextDate">Note {idx + 1}</span>
                 )}
-                <button
-                  type="button"
-                  className="pillarContextRemove"
+                <ActionIconButton
+                  label={`Remove context note: ${entry.text}`}
                   onClick={() => handleRemoveEntry(idx)}
-                  aria-label={`Remove context note: ${entry.text}`}
-                  title={`Remove: ${truncateForConfirm(entry.text, 60)}`}
+                  variant="danger"
+                  className="pillarContextRemove"
                 >
-                  Remove
-                </button>
+                  <DeleteIcon />
+                </ActionIconButton>
               </div>
               <p className="pillarContextText">{entry.text}</p>
             </li>

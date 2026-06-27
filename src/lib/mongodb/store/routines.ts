@@ -29,6 +29,7 @@ function routineToRow(r: MongoRoutine) {
     pillar_id: r.pillarId,
     milestone_id: r.milestoneId,
     spawn_task_cards: r.spawnTaskCards ? 1 : 0,
+    end_date: r.endDate ?? null,
     active: r.active ? 1 : 0,
     rank: r.rank,
     rules: r.rules ?? null,
@@ -78,6 +79,7 @@ export async function insertRoutine(
     pillarId: number | null;
     milestoneId: number | null;
     spawnTaskCards: boolean;
+    endDate?: string | null;
     rank: number;
     rules?: string | null;
   }
@@ -99,6 +101,7 @@ export async function insertRoutine(
     pillarId: data.pillarId,
     milestoneId: data.milestoneId,
     spawnTaskCards: data.spawnTaskCards,
+    endDate: data.endDate ?? null,
     active: true,
     rank: data.rank,
     rules: data.rules?.trim() || null,
@@ -120,6 +123,7 @@ export async function updateRoutine(
     pillarId: number | null;
     milestoneId: number | null;
     spawnTaskCards: boolean;
+    endDate: string | null;
     active: boolean;
     rank: number;
     rules: string | null;
@@ -261,6 +265,7 @@ export function parseRoutineRow(raw: Record<string, unknown>): MongoRoutine & { 
     pillarId: raw.pillar_id != null ? Number(raw.pillar_id) : null,
     milestoneId: raw.milestone_id != null ? Number(raw.milestone_id) : null,
     spawnTaskCards: Number(raw.spawn_task_cards) === 1,
+    endDate: raw.end_date != null ? String(raw.end_date).slice(0, 10) : null,
     active: Number(raw.active) === 1,
     rank: Number(raw.rank),
     rules: raw.rules != null ? String(raw.rules) : null,

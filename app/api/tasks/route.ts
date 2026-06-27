@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { requireSessionUser } from "../../../src/lib/auth";
 import { isYyyyMmDd } from "../../../src/lib/date";
 import {
+  getMaxIdeaRankForPillar,
   getMaxTaskRank,
   insertTask,
   listTasks,
@@ -29,17 +30,27 @@ export const POST = async (req: Request) => {
       deadline?: string | null;
       pillar_id?: number | null;
       milestone_id?: number | null;
+      is_idea?: boolean;
     };
 
     const title = body.title?.trim();
     if (!title) {
       return NextResponse.json({ ok: false, error: "Title is required" }, { status: 400 });
     }
+    const isIdea = !!body.is_idea;
+    if (isIdea && body.deadline) {
+      return NextResponse.json(
+        { ok: false, error: "Ideas cannot have a deadline — add a date later to schedule" },
+        { status: 400 }
+      );
+    }
     if (body.deadline && !isYyyyMmDd(body.deadline)) {
       return NextResponse.json({ ok: false, error: "Invalid deadline" }, { status: 400 });
     }
 
-    const rank = (await getMaxTaskRank(user.id)) + 1;
+    const rank = isIdea
+      ? (await getMaxIdeaRankForPillar(user.id, body.pillar_id ?? null)) + 1
+      : (await getMaxTaskRank(user.id)) + 1;
     const task = await insertTask(user.id, {
       title,
       description: body.description?.trim() || null,
@@ -48,6 +59,7 @@ export const POST = async (req: Request) => {
       rank,
       pillarId: body.pillar_id ?? null,
       milestoneId: body.milestone_id ?? null,
+      isIdea,
     });
 
     return NextResponse.json({ ok: true, task });

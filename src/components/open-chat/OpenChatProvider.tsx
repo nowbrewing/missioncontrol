@@ -20,12 +20,61 @@ import ChatTaskNotesReviewModal, {
   type NewTaskNoteDraft,
   type TaskNoteUpdateDraft,
 } from "../ChatTaskNotesReviewModal";
+import CorrectionReviewModal from "../correction/CorrectionReviewModal";
 import { todayIsoYyyyMmDd } from "../../lib/date";
+import {
+  applyProposedCorrections,
+  loadCorrectionKickoff,
+  proposeCorrectionsFromMessages,
+} from "../../lib/chat-correction-skill";
+import { notifyDailyLogChanged } from "../../lib/daily-log-events";
 import { appendTaskNote } from "../../lib/task-notes";
-import { parseChatSlashCommand, type ChatMode } from "../../lib/chat-mode";
+import { parseChatSlashCommand, type ChatMode, type ForcedSkillId } from "../../lib/chat-mode";
+import type { ProposedCorrection } from "../../lib/adk/propose-corrections";
 import type { ChatBriefContext, ChatMessage, OpenChatContextValue } from "./types";
 
 const OpenChatContext = createContext<OpenChatContextValue | null>(null);
+
+type ExtractedTaskNotesApiData = {
+  task_note_updates?: {
+    task_id: number;
+    task_title: string;
+    existing_note: string | null;
+    note: string;
+  }[];
+  new_tasks?: {
+    title: string;
+    pillar: string;
+    pillar_id: number | null;
+    note: string;
+    deadline: string | null;
+    bucket: "Today" | "Next 7 days" | "Later";
+  }[];
+};
+
+function mapExtractedTaskNotes(data: ExtractedTaskNotesApiData, idPrefix: string) {
+  const noteUpdates: TaskNoteUpdateDraft[] = (data.task_note_updates ?? []).map(
+    (row, i) => ({
+      localId: `${idPrefix}-note-update-${row.task_id}-${i}`,
+      task_id: row.task_id,
+      task_title: row.task_title,
+      existing_note: row.existing_note,
+      note: row.note,
+    })
+  );
+
+  const newTasks: NewTaskNoteDraft[] = (data.new_tasks ?? []).map((row, i) => ({
+    localId: `${idPrefix}-new-task-note-${i}-${row.title}`,
+    title: row.title,
+    pillar: row.pillar,
+    pillar_id: row.pillar_id,
+    note: row.note,
+    deadline: row.deadline,
+    bucket: row.bucket,
+  }));
+
+  return { noteUpdates, newTasks };
+}
 
 export function useOpenChat() {
   const ctx = useContext(OpenChatContext);
@@ -74,6 +123,12 @@ export function OpenChatProvider({
   const [newTasksWithNotes, setNewTasksWithNotes] = useState<NewTaskNoteDraft[]>([]);
   const [savingTaskNotes, setSavingTaskNotes] = useState(false);
   const [taskNotesSaveError, setTaskNotesSaveError] = useState<string | null>(null);
+  const [correctionWeekLabel, setCorrectionWeekLabel] = useState<string | null>(null);
+  const [correctionProposing, setCorrectionProposing] = useState(false);
+  const [correctionReviewOpen, setCorrectionReviewOpen] = useState(false);
+  const [correctionProposals, setCorrectionProposals] = useState<ProposedCorrection[]>([]);
+  const [savingCorrections, setSavingCorrections] = useState(false);
+  const [correctionSaveError, setCorrectionSaveError] = useState<string | null>(null);
   const pendingClearAfterRef = useRef(false);
   const taskNotesReviewOpenRef = useRef(false);
   const router = useRouter();
@@ -84,6 +139,7 @@ export function OpenChatProvider({
   const chatBusyRef = useRef(chatBusy);
   const handoffBusyRef = useRef(handoffBusy);
   const generalSessionStartRef = useRef<number | null>(null);
+  const correctionSessionStartRef = useRef<number | null>(null);
   const copilotHandoffSummaryRef = useRef<string | null>(null);
   const planDateRef = useRef(planDate);
   const finalizeInFlightRef = useRef(false);
@@ -206,12 +262,42 @@ export function OpenChatProvider({
     });
   }
 
+  const openExtractedTaskNotesReview = useCallback(
+    async (data: ExtractedTaskNotesApiData, idPrefix: string) => {
+      const { noteUpdates, newTasks } = mapExtractedTaskNotes(data, idPrefix);
+      if (noteUpdates.length === 0 && newTasks.length === 0) return false;
+
+      let brief = chatBrief;
+      if (!brief) {
+        brief = await loadChatBrief(planDateRef.current);
+        if (brief) setChatBrief(brief);
+      }
+
+      const briefTasks: ChatBriefContext["tasks"] =
+        brief?.tasks ?? (await loadChatBrief(planDateRef.current))?.tasks ?? [];
+      if (
+        briefTasks.filter((t) => !t.completed_at).length === 0 &&
+        noteUpdates.length > 0
+      ) {
+        return false;
+      }
+
+      setTaskNoteUpdates(noteUpdates);
+      setNewTasksWithNotes(newTasks);
+      setTaskNotesSaveError(null);
+      setTaskNotesReviewOpen(true);
+      return true;
+    },
+    [chatBrief, loadChatBrief]
+  );
+
   const finalizeChatSession = useCallback(async (clearAfter = false) => {
     if (
       finalizeInFlightRef.current ||
       chatBusyRef.current ||
       taskNotesReviewOpenRef.current ||
-      chatModeRef.current === "general"
+      chatModeRef.current === "general" ||
+      chatModeRef.current === "correction"
     ) {
       return;
     }
@@ -246,77 +332,14 @@ export function OpenChatProvider({
         return;
       }
 
-      const noteUpdates: TaskNoteUpdateDraft[] = (data.task_note_updates ?? []).map(
-        (
-          row: {
-            task_id: number;
-            task_title: string;
-            existing_note: string | null;
-            note: string;
-          },
-          i: number
-        ) => ({
-          localId: `note-update-${row.task_id}-${i}`,
-          task_id: row.task_id,
-          task_title: row.task_title,
-          existing_note: row.existing_note,
-          note: row.note,
-        })
-      );
-
-      const newTasks: NewTaskNoteDraft[] = (data.new_tasks ?? []).map(
-        (
-          row: {
-            title: string;
-            pillar: string;
-            pillar_id: number | null;
-            note: string;
-            deadline: string | null;
-            bucket: "Today" | "Next 7 days" | "Later";
-          },
-          i: number
-        ) => ({
-          localId: `new-task-note-${i}-${row.title}`,
-          title: row.title,
-          pillar: row.pillar,
-          pillar_id: row.pillar_id,
-          note: row.note,
-          deadline: row.deadline,
-          bucket: row.bucket,
-        })
-      );
-
-      if (noteUpdates.length === 0 && newTasks.length === 0) {
+      const opened = await openExtractedTaskNotesReview(data, "finalize");
+      if (!opened) {
         summarizedCountRef.current = all.length;
         if (clearAfter) {
           setChatMessages([]);
           summarizedCountRef.current = 0;
         }
-        return;
       }
-
-      if (!chatBrief) {
-        const brief = await loadChatBrief(planDateRef.current);
-        if (brief) setChatBrief(brief);
-      }
-
-      const briefTasks: ChatBriefContext["tasks"] =
-        chatBrief?.tasks ??
-        (await loadChatBrief(planDateRef.current))?.tasks ??
-        [];
-      if (briefTasks.filter((t) => !t.completed_at).length === 0 && noteUpdates.length > 0) {
-        summarizedCountRef.current = all.length;
-        if (clearAfter) {
-          setChatMessages([]);
-          summarizedCountRef.current = 0;
-        }
-        return;
-      }
-
-      setTaskNoteUpdates(noteUpdates);
-      setNewTasksWithNotes(newTasks);
-      setTaskNotesSaveError(null);
-      setTaskNotesReviewOpen(true);
     } catch {
       summarizedCountRef.current = all.length;
       if (clearAfter) {
@@ -327,7 +350,7 @@ export function OpenChatProvider({
       finalizeInFlightRef.current = false;
       setSummarizingSession(false);
     }
-  }, [chatBrief, loadChatBrief]);
+  }, [openExtractedTaskNotesReview]);
 
   const finalizeChatSessionRef = useRef(finalizeChatSession);
   finalizeChatSessionRef.current = finalizeChatSession;
@@ -575,8 +598,100 @@ export function OpenChatProvider({
 
   function enterGeneralMode() {
     generalSessionStartRef.current = chatMessagesRef.current.length;
+    correctionSessionStartRef.current = null;
+    setCorrectionWeekLabel(null);
     copilotHandoffSummaryRef.current = null;
     setChatMode("general");
+  }
+
+  async function enterCorrectionMode() {
+    generalSessionStartRef.current = null;
+    copilotHandoffSummaryRef.current = null;
+    correctionSessionStartRef.current = chatMessagesRef.current.length;
+    setChatMode("correction");
+    setChatError(null);
+
+    try {
+      const ctx = await loadCorrectionKickoff(planDateRef.current);
+      setCorrectionWeekLabel(ctx.week_label);
+      setChatMessages((prev) => [
+        ...prev,
+        {
+          id: `assistant-correction-kickoff-${Date.now()}`,
+          role: "assistant",
+          content: ctx.kickoff,
+          mode: "correction",
+        },
+      ]);
+    } catch (err) {
+      correctionSessionStartRef.current = null;
+      setCorrectionWeekLabel(null);
+      setChatMode("copilot");
+      throw err;
+    }
+  }
+
+  function correctionSegmentMessages() {
+    const start = correctionSessionStartRef.current ?? 0;
+    return chatMessagesRef.current
+      .slice(start)
+      .map((m) => ({ role: m.role, content: m.content }));
+  }
+
+  async function openCorrectionProposeFlow() {
+    const segment = correctionSegmentMessages();
+    if (!segment.some((m) => m.role === "user")) return;
+
+    setCorrectionProposing(true);
+    setChatError(null);
+    try {
+      const rows = await proposeCorrectionsFromMessages(planDateRef.current, segment);
+      if (rows.length === 0) {
+        setChatError(
+          "No matching records to update — try being more specific about what to fix."
+        );
+        return;
+      }
+      setCorrectionProposals(rows);
+      setCorrectionSaveError(null);
+      setCorrectionReviewOpen(true);
+    } catch (err) {
+      setChatError(err instanceof Error ? err.message : "Propose failed");
+    } finally {
+      setCorrectionProposing(false);
+    }
+  }
+
+  async function confirmCorrectionApply(corrections: ProposedCorrection[]) {
+    setSavingCorrections(true);
+    setCorrectionSaveError(null);
+    try {
+      const saved = await applyProposedCorrections(corrections);
+      setCorrectionReviewOpen(false);
+      setCorrectionProposals([]);
+      setSessionSaveNotice(
+        `Updated ${saved} record${saved === 1 ? "" : "s"}`
+      );
+      window.setTimeout(() => setSessionSaveNotice(null), 5000);
+      notifyDailyLogChanged(planDateRef.current);
+      const brief = await loadChatBrief(planDateRef.current);
+      if (brief) applyChatBrief(brief);
+    } catch (err) {
+      setCorrectionSaveError(err instanceof Error ? err.message : "Apply failed");
+    } finally {
+      setSavingCorrections(false);
+    }
+  }
+
+  function dismissCorrectionReview() {
+    if (savingCorrections) return;
+    setCorrectionReviewOpen(false);
+    setCorrectionSaveError(null);
+  }
+
+  function exitCorrectionMode() {
+    correctionSessionStartRef.current = null;
+    setCorrectionWeekLabel(null);
   }
 
   async function performGeneralHandoff(): Promise<void> {
@@ -624,6 +739,18 @@ export function OpenChatProvider({
         }
         return kept;
       });
+
+      if (data.daily_log?.entry_id) {
+        notifyDailyLogChanged(
+          typeof data.daily_log.log_date === "string"
+            ? data.daily_log.log_date
+            : planDateRef.current
+        );
+        setSessionSaveNotice("Saved to daily log");
+        window.setTimeout(() => setSessionSaveNotice(null), 4500);
+      }
+
+      await openExtractedTaskNotesReview(data, "handoff");
     } catch (err) {
       setChatError(err instanceof Error ? err.message : "Handoff failed");
     } finally {
@@ -632,6 +759,11 @@ export function OpenChatProvider({
   }
 
   async function switchToCopilotMode() {
+    if (chatModeRef.current === "correction") {
+      exitCorrectionMode();
+      setChatMode("copilot");
+      return;
+    }
     if (chatModeRef.current !== "general") {
       setChatMode("copilot");
       return;
@@ -645,8 +777,10 @@ export function OpenChatProvider({
     const raw = chatInput.trim();
     if (!raw || chatBusy || handoffBusy) return;
 
-    const { modeSwitch, message, navigate } = parseChatSlashCommand(raw);
+    const { modeSwitch, message, navigate, forcedSkill: slashForcedSkill } =
+      parseChatSlashCommand(raw);
     let activeMode = chatMode;
+    let turnForcedSkill: ForcedSkillId | null = slashForcedSkill ?? null;
 
     if (navigate) {
       setChatInput("");
@@ -660,7 +794,28 @@ export function OpenChatProvider({
       await performGeneralHandoff();
       activeMode = "copilot";
       if (!message) return;
+    } else if (modeSwitch === "copilot") {
+      setChatInput("");
+      exitCorrectionMode();
+      setChatMode("copilot");
+      activeMode = "copilot";
+      if (!message) return;
+    } else if (modeSwitch === "correction") {
+      setChatInput("");
+      if (chatMode !== "correction") {
+        try {
+          await enterCorrectionMode();
+        } catch (err) {
+          setChatError(
+            err instanceof Error ? err.message : "Could not start correction"
+          );
+          return;
+        }
+      }
+      activeMode = "correction";
+      if (!message) return;
     } else if (modeSwitch === "general") {
+      exitCorrectionMode();
       enterGeneralMode();
       activeMode = "general";
       if (!message) {
@@ -691,15 +846,21 @@ export function OpenChatProvider({
       }
 
       const generalStart = generalSessionStartRef.current ?? 0;
+      const correctionStart = correctionSessionStartRef.current ?? 0;
       const history =
         activeMode === "general"
           ? chatMessages.slice(generalStart).map((m) => ({
               role: m.role,
               content: m.content,
             }))
-          : chatMessages
-              .filter((m) => m.mode !== "general")
-              .map((m) => ({ role: m.role, content: m.content }));
+          : activeMode === "correction"
+            ? chatMessages.slice(correctionStart).map((m) => ({
+                role: m.role,
+                content: m.content,
+              }))
+            : chatMessages
+                .filter((m) => m.mode !== "general" && m.mode !== "correction")
+                .map((m) => ({ role: m.role, content: m.content }));
 
       const handoffSummary =
         activeMode === "copilot" ? copilotHandoffSummaryRef.current : null;
@@ -714,6 +875,7 @@ export function OpenChatProvider({
           message,
           plan_date: planDate,
           mode: activeMode,
+          forced_skill: turnForcedSkill,
           history,
           general_handoff_summary: handoffSummary,
         }),
@@ -733,7 +895,14 @@ export function OpenChatProvider({
         },
       ]);
 
-      if (activeMode !== "copilot") return;
+      const shouldReviewTasks =
+        activeMode === "copilot" ||
+        turnForcedSkill === "create-task" ||
+        turnForcedSkill === "edit-task" ||
+        data.routed === "create-task" ||
+        data.routed === "edit-task";
+
+      if (!shouldReviewTasks) return;
 
       const taskDrafts: ProposedTaskDraft[] = (data.proposed_tasks ?? []).map(
         (
@@ -776,12 +945,21 @@ export function OpenChatProvider({
 
   async function toggleChatMode() {
     if (chatBusyRef.current || handoffBusyRef.current) return;
+    if (chatModeRef.current === "correction") {
+      exitCorrectionMode();
+      setChatMode("copilot");
+      return;
+    }
     if (chatModeRef.current === "general") {
       await switchToCopilotMode();
     } else {
       enterGeneralMode();
     }
   }
+
+  const correctionHasUserReply = chatMessages.some(
+    (m) => m.mode === "correction" && m.role === "user"
+  );
 
   const value: OpenChatContextValue = {
     planDate,
@@ -795,6 +973,10 @@ export function OpenChatProvider({
     chatError,
     summarizingSession,
     sessionSaveNotice,
+    correctionWeekLabel,
+    correctionProposing,
+    correctionHasUserReply,
+    openCorrectionProposeFlow,
     floatingOpen,
     openFloatingChat,
     closeFloatingChat,
@@ -862,6 +1044,15 @@ export function OpenChatProvider({
           saveError={taskEditsSaveError}
           onConfirm={confirmTaskEdits}
           onDismiss={dismissTaskEditsReview}
+        />
+      )}
+      {correctionReviewOpen && (
+        <CorrectionReviewModal
+          corrections={correctionProposals}
+          saving={savingCorrections}
+          saveError={correctionSaveError}
+          onConfirm={(rows) => void confirmCorrectionApply(rows)}
+          onDismiss={dismissCorrectionReview}
         />
       )}
     </OpenChatContext.Provider>

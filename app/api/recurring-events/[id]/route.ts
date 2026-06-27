@@ -1,12 +1,20 @@
 import { NextResponse } from "next/server";
 import { requireSessionUser } from "../../../../src/lib/auth";
+import { isYyyyMmDd } from "../../../../src/lib/date";
 import {
   DEFAULT_DAILY_DAYS,
   normalizeRecurringKind,
   type RecurringKind,
 } from "../../../../src/lib/recurring-week";
 import {
+  ensureHabitCalendarTasks,
+  pruneRecurringTasksAfterEndDate,
+  regenerateHabitCalendarTasks,
+  resetFutureRoutineCalendarTasks,
+} from "../../../../src/lib/recurring-events";
+import {
   deleteRoutine,
+  findRoutine,
   updateRoutine,
 } from "../../../../src/lib/mongodb/store/routines";
 
@@ -32,6 +40,8 @@ export const PATCH = async (req: Request, { params }: Params) => {
       pillar_id?: number | null;
       milestone_id?: number | null;
       spawn_task_cards?: boolean;
+      end_date?: string | null;
+      calendar_restart_from?: string | null;
       active?: boolean;
       rules?: string | null;
     };
@@ -45,6 +55,7 @@ export const PATCH = async (req: Request, { params }: Params) => {
       pillarId: number | null;
       milestoneId: number | null;
       spawnTaskCards: boolean;
+      endDate: string | null;
       active: boolean;
       rules: string | null;
     }> = {};
@@ -99,6 +110,13 @@ export const PATCH = async (req: Request, { params }: Params) => {
     if (body.spawn_task_cards !== undefined) {
       patch.spawnTaskCards = !!body.spawn_task_cards;
     }
+    if (body.end_date !== undefined) {
+      if (body.end_date !== null && body.end_date !== "" && !isYyyyMmDd(body.end_date)) {
+        return NextResponse.json({ ok: false, error: "Invalid end_date" }, { status: 400 });
+      }
+      patch.endDate =
+        body.end_date == null || body.end_date === "" ? null : body.end_date;
+    }
     if (body.active !== undefined) {
       patch.active = !!body.active;
     }
@@ -111,6 +129,34 @@ export const PATCH = async (req: Request, { params }: Params) => {
     }
 
     await updateRoutine(user.id, eventId, patch);
+
+    const scheduleChanged =
+      patch.dailyDays !== undefined ||
+      patch.targetFrequency !== undefined ||
+      patch.kind !== undefined ||
+      patch.spawnTaskCards !== undefined;
+
+    if (patch.endDate !== undefined) {
+      await pruneRecurringTasksAfterEndDate(user.id, eventId, patch.endDate);
+    }
+
+    const routine = await findRoutine(user.id, eventId);
+    const restartFrom =
+      body.calendar_restart_from !== undefined &&
+      body.calendar_restart_from !== null &&
+      body.calendar_restart_from !== "" &&
+      isYyyyMmDd(body.calendar_restart_from)
+        ? body.calendar_restart_from
+        : null;
+
+    if (restartFrom && routine?.spawnTaskCards) {
+      await regenerateHabitCalendarTasks(user.id, eventId, restartFrom);
+    } else if (routine?.spawnTaskCards && (scheduleChanged || patch.endDate !== undefined)) {
+      if (scheduleChanged) {
+        await resetFutureRoutineCalendarTasks(user.id, eventId);
+      }
+      await ensureHabitCalendarTasks(user.id);
+    }
 
     return NextResponse.json({ ok: true });
   } catch (e: unknown) {

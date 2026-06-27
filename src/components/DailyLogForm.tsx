@@ -13,11 +13,13 @@ import {
   checkInEntryLabel,
   isCheckInLogKind,
 } from "../lib/check-in-log";
+import ActionIconButton, { DeleteIcon, EditIcon } from "./ActionIconButton";
 import {
   assistantChatEntryLabel,
   isAssistantChatLogKind,
   logKindShowsPillarTags,
 } from "../lib/assistant-chat-log";
+import { DAILY_LOG_CHANGED_EVENT } from "../lib/daily-log-events";
 import {
   isWeeklySummaryLogKind,
   weeklySummaryEntryLabel,
@@ -235,27 +237,23 @@ function LogEntryRow({
             >
               Cancel
             </button>
-            <button
-              type="button"
-              className="btnCompact outlineButton"
+            <ActionIconButton
+              label="Delete entry"
               onClick={() => void remove()}
               disabled={busy}
+              variant="danger"
             >
-              {deleting ? "Deleting..." : "Delete"}
-            </button>
+              <DeleteIcon />
+            </ActionIconButton>
           </div>
         </>
       ) : (
         <>
           <p className="dailyLogEntryBody">{entry.content}</p>
           <div className="dailyLogEntryActions">
-            <button
-              type="button"
-              className="btnCompact outlineButton"
-              onClick={() => setEditing(true)}
-            >
-              Edit
-            </button>
+            <ActionIconButton label="Edit entry" onClick={() => setEditing(true)}>
+              <EditIcon />
+            </ActionIconButton>
           </div>
         </>
       )}
@@ -342,6 +340,16 @@ export default function DailyLogForm() {
 
   useEffect(() => {
     load(fromDate, toDate);
+  }, [fromDate, toDate, load]);
+
+  useEffect(() => {
+    const onDailyLogChanged = () => {
+      void load(fromDate, toDate);
+    };
+    window.addEventListener(DAILY_LOG_CHANGED_EVENT, onDailyLogChanged);
+    return () => {
+      window.removeEventListener(DAILY_LOG_CHANGED_EVENT, onDailyLogChanged);
+    };
   }, [fromDate, toDate, load]);
 
   function goToMonth(monthStart: Date) {

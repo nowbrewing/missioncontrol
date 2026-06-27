@@ -139,7 +139,7 @@ export async function extractChatTaskNotes(params: {
 
   const transcript = formatTranscript(messages);
   const raw = await generateGeminiText(
-    `You are reviewing a Mission Control assistant chat to save durable notes onto the user's task board.
+    `You are reviewing a chat (Mission Control co-pilot or general plain-AI mode) to save durable notes onto the user's task board.
 
 Planning date: ${params.planDate}
 Pillars: ${pillarRows.map((p) => `${p.name} (id=${p.id})`).join(", ") || "none"}

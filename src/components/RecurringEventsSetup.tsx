@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import ActionIconButton, { DeleteIcon, EditIcon } from "./ActionIconButton";
 import TaskPillarSelect from "./TaskPillarSelect";
 import {
   DEFAULT_DAILY_DAYS,
@@ -406,9 +407,9 @@ function EventListItem({
         <EventMetaPills event={event} />
       </div>
       <div className="recurringSetupItemActions">
-        <button type="button" className="outlineButton btnCompact" onClick={onEdit}>
-          Edit
-        </button>
+        <ActionIconButton label={`Edit ${event.title}`} onClick={onEdit}>
+          <EditIcon />
+        </ActionIconButton>
         <button
           type="button"
           className="outlineButton btnCompact"
@@ -416,14 +417,13 @@ function EventListItem({
         >
           {event.active ? "Deactivate" : "Reactivate"}
         </button>
-        <button
-          type="button"
-          className="rankBtn"
+        <ActionIconButton
+          label={`Delete ${event.title}`}
           onClick={onDelete}
-          aria-label={`Delete ${event.title}`}
+          variant="danger"
         >
-          ×
-        </button>
+          <DeleteIcon />
+        </ActionIconButton>
       </div>
     </li>
   );
