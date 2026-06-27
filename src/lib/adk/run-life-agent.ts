@@ -2,7 +2,7 @@ import { InMemoryRunner } from "@google/adk";
 import { createPartFromText } from "@google/genai";
 import { buildLifeAgentSystemContext } from "./build-life-agent-context";
 import { CHECK_IN_PROPOSED_TASKS_INSTRUCTION } from "./check-in-prompt";
-import { PRIORITIZE_INSTRUCTION } from "./prioritize-prompt";
+import { buildPrioritizeInstruction } from "./prioritize-prompt";
 import { ensureGenAiEnv } from "./genai-config";
 import { lifeAgent, LIFE_AGENT_APP_NAME } from "./life-agent";
 
@@ -45,7 +45,7 @@ export async function runLifeAgent(params: {
   );
   const historyBlock = formatHistory(params.history ?? []);
   const modeBlock = params.prioritize
-    ? `\n\n${PRIORITIZE_INSTRUCTION}`
+    ? `\n\n${buildPrioritizeInstruction(params.planDate)}`
     : params.checkIn
       ? `\n\n${CHECK_IN_PROPOSED_TASKS_INSTRUCTION}`
       : "";

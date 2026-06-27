@@ -1,5 +1,6 @@
-import { formatPillarContextForPrompt } from "../pillar-context";
+import { agentBucketRulesForPrompt, next7DaysEnd } from "../mission-buckets";
 import { addDaysIsoYyyyMmDd } from "../date";
+import { formatPillarContextForPrompt } from "../pillar-context";
 import { ensureLifeAdminSetup } from "../life-admin-setup";
 import {
   computeLifeAdminStats,
@@ -11,6 +12,7 @@ import { listMilestones } from "../mongodb/store/milestones";
 import { listActiveRoutines } from "../mongodb/store/routines";
 import { listTasks } from "../mongodb/store/tasks";
 import { listPillars } from "../mongodb/store/users";
+import { routineRulesSuffix } from "../routine-rules";
 
 export type OrchestrationContext = Awaited<ReturnType<typeof loadOrchestrationContext>>;
 
@@ -123,8 +125,8 @@ ${pillarGoals.map((g) => `- ${g.title} status=${g.status}`).join("\n") || "(none
 MILESTONES:
 ${pillarMilestones.map((m) => `- id=${m.id} ${m.title} target=${m.target_date ?? "none"}`).join("\n") || "(none)"}
 
-ROUTINES (weekly habits — spread across the week, avoid back-to-back overload):
-${pillarRoutines.map((r) => `- id=${r.tursoId} ${r.title} target=${r.targetFrequency}/week kind=${r.kind}`).join("\n") || "(none)"}
+ROUTINES (weekly habits — spread across the week; honor per-habit rules when present):
+${pillarRoutines.map((r) => `- id=${r.tursoId} ${r.title} target=${r.targetFrequency}/week kind=${r.kind}${routineRulesSuffix(r.rules)}`).join("\n") || "(none)"}
 
 OPEN TASKS:
 ${pillarTasks.map(formatTaskLine).join("\n") || "(none)"}
@@ -165,7 +167,7 @@ export function buildLifeSynthesisPrompt(
   return `Planning date: ${ctx.planDate}
 Mode: ${mode === "check_in" ? "check-in (may include new tasks)" : "prioritize (existing tasks only)"}
 
-${buildDayCoachingBlock(ctx)}
+${buildDayCopilotBlock(ctx)}
 
 ALL OPEN TASK IDS (each must appear exactly once in today, this_week, or later):
 [${allTaskIds || "none"}]
@@ -197,7 +199,7 @@ function formatPillarBlock(
 Context: ${pillarContext ? pillarContext.replace(/\n/g, " | ") : "(none)"}
 Goals: ${pillarGoals.map((g) => g.title).join("; ") || "(none)"}
 Milestones: ${pillarMilestones.map((m) => `${m.title} (${m.target_date ?? "no date"})`).join("; ") || "(none)"}
-Routines: ${pillarRoutines.map((r) => `${r.title} ${r.targetFrequency}/wk`).join("; ") || "(none)"}
+Routines: ${pillarRoutines.map((r) => `${r.title} ${r.targetFrequency}/wk${routineRulesSuffix(r.rules)}`).join("; ") || "(none)"}
 Open tasks:
 ${pillarTasks.map(formatTaskLine).join("\n") || "(none)"}
 Recent completions: ${pillarCompletions.map((t) => t.title).join("; ") || "(none)"}`;
@@ -218,7 +220,7 @@ function pillarNameById(
   return match ? String(match.name) : "General";
 }
 
-function buildDayCoachingBlock(ctx: OrchestrationContext) {
+function buildDayCopilotBlock(ctx: OrchestrationContext) {
   const openById = new Map(ctx.openTasks.map((t) => [Number(t.id), t]));
   const rolledOver = new Map<string, number>();
 
@@ -260,7 +262,7 @@ function buildDayCoachingBlock(ctx: OrchestrationContext) {
       .map(([pillar, count]) => `- ${pillar}: ${count} completions in last 3 days`)
       .join("\n") || "(none)";
 
-  return `DAY COACHING (use for tone in kickoff/rest_of_day — do not copy verbatim as task lists):
+  return `DAY CO-PILOT (use for tone in kickoff/rest_of_day — do not copy verbatim as task lists):
 Rolled over / unfinished from before today:
 ${rolledLines}
 
@@ -313,7 +315,10 @@ ${miscTasks.map(formatTaskLine).join("\n")}`
   return `Planning date: ${ctx.planDate}
 Mode: prioritize (existing tasks only — no new tasks)
 
-${buildDayCoachingBlock(ctx)}
+${agentBucketRulesForPrompt(ctx.planDate)}
+Next 7 days window ends: ${next7DaysEnd(ctx.planDate)}
+
+${buildDayCopilotBlock(ctx)}
 
 ALL OPEN TASK IDS (each must appear exactly once in today, this_week, or later):
 [${allTaskIds || "none"}]

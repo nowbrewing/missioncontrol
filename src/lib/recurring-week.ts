@@ -51,6 +51,24 @@ export function serializeDailyDays(days: DailyDaysMask): string {
   return JSON.stringify(days);
 }
 
+export function countSelectedDays(days: DailyDaysMask): number {
+  return days.filter(Boolean).length;
+}
+
+export function selectedDayIndices(days: DailyDaysMask): number[] {
+  return days.map((on, i) => (on ? i : -1)).filter((i) => i >= 0);
+}
+
+/** Spread N sessions across the week (Mon → Sun priority). */
+export function defaultCalendarDaysForCount(count: number): DailyDaysMask {
+  const preferred = [0, 2, 4, 1, 3, 5, 6];
+  const days: DailyDaysMask = [false, false, false, false, false, false, false];
+  for (let i = 0; i < Math.min(count, 7); i++) {
+    days[preferred[i]] = true;
+  }
+  return days;
+}
+
 export function emptyProgress(
   kind: RecurringKind,
   targetCount: number,
@@ -137,6 +155,13 @@ export function dailyTallyTotal(progress: DailyTallyProgress): number {
     (sum, n) => sum + (Number.isFinite(Number(n)) ? Number(n) : 0),
     0
   );
+}
+
+/** Progress bar fill — clamped at 0 when the running total is negative. */
+export function tallyBarFillPercent(total: number, targetCount: number): number {
+  if (targetCount <= 0) return 0;
+  const barTotal = Math.max(0, total);
+  return Math.min(100, (barTotal / targetCount) * 100);
 }
 
 export function normalizeRecurringKind(

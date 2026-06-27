@@ -23,12 +23,14 @@ import {
 import { CSS } from "@dnd-kit/utilities";
 import { useCallback, useEffect, useState, type ReactNode } from "react";
 import PillarChip from "./PillarChip";
+import ActionIconButton, { DeleteIcon } from "./ActionIconButton";
 import TaskCardMeta from "./TaskCardMeta";
 import TaskDateLockToggle from "./TaskDateLockToggle";
 import TaskDeadlineEditor from "./TaskDeadlineEditor";
+import TaskNoteEditor from "./TaskNoteEditor";
 import TaskTitleEditor from "./TaskTitleEditor";
 import { formatRelativeDateLabel } from "../lib/mission-dates";
-import { sortComingUpByDate, type BoardItem } from "../lib/mission-layout";
+import { sortComingUpByDate, sortTodayWithCompletedAtBottom, type BoardItem } from "../lib/mission-layout";
 import type { MissionReflectionDisplay } from "../lib/mission-reflection-display";
 import MissionReflection from "./MissionReflection";
 import { pillarColorVars } from "../lib/pillar-colors";
@@ -52,7 +54,7 @@ function greatJobMessage(
 ) {
   if (openBoardItems(items).length > 0) return null;
   if (scope === "week") {
-    return "Great job! You're all caught up for this week.";
+    return "Great job! You're all caught up for the next 7 days.";
   }
   if (focusDate === calendarToday) {
     return "Great job! Nothing left for today.";
@@ -93,11 +95,13 @@ function SortableBoardRow({
   onMilestoneChange,
   onScheduleChange,
   onTitleChange,
+  onNoteChange,
   onDeleteTask,
   onDateLockChange,
   onDemoteToWeek,
   onDemoteToFuture,
   onPromoteToToday,
+  hideDragHandle = false,
 }: {
   item: BoardItem;
   today: string;
@@ -110,11 +114,13 @@ function SortableBoardRow({
   onMilestoneChange: (id: number, milestoneId: number | null) => void;
   onScheduleChange: (id: number, mode: TaskScheduleMode) => void;
   onTitleChange: (id: number, title: string) => void | Promise<void>;
+  onNoteChange: (id: number, note: string | null) => void | Promise<void>;
   onDeleteTask: (id: number) => void;
   onDateLockChange?: (id: number, locked: boolean, deadline: string | null) => void;
   onDemoteToWeek?: (item: BoardItem) => void;
   onDemoteToFuture?: (item: BoardItem) => void;
   onPromoteToToday?: (item: BoardItem) => void;
+  hideDragHandle?: boolean;
 }) {
   const {
     attributes,
@@ -124,7 +130,7 @@ function SortableBoardRow({
     transform,
     transition,
     isDragging,
-  } = useSortable({ id: item.key });
+  } = useSortable({ id: item.key, disabled: hideDragHandle });
 
   const style = {
     transform: CSS.Transform.toString(transform),
@@ -144,19 +150,23 @@ function SortableBoardRow({
         ...style,
         ...(item.pillar_color ? pillarColorVars(item.pillar_color) : {}),
       }}
-      className={`comingUpItem boardItem ${isDragging ? "isDragging" : ""} ${item.pillar_color ? "taskRowColored" : ""}`}
+      className={`comingUpItem boardItem ${isDragging ? "isDragging" : ""} ${item.completed_at ? "taskRowDone" : ""} ${item.pillar_color ? "taskRowColored" : ""}`}
     >
       <div className="boardItemLead">
-        <button
-          type="button"
-          ref={setActivatorNodeRef}
-          className="dragHandle boardDragHandle"
-          aria-label={`Drag to reorder: ${item.title}`}
-          {...listeners}
-          {...attributes}
-        >
-          ⠿
-        </button>
+        {hideDragHandle ? (
+          <span className="boardDragHandleSpacer" aria-hidden />
+        ) : (
+          <button
+            type="button"
+            ref={setActivatorNodeRef}
+            className="dragHandle boardDragHandle"
+            aria-label={`Drag to reorder: ${item.title}`}
+            {...listeners}
+            {...attributes}
+          >
+            ⠿
+          </button>
+        )}
         {item.kind === "task" ? (
           <label className="boardTaskCheck">
             <input
@@ -238,9 +248,9 @@ function SortableBoardRow({
                     type="button"
                     className="outlineButton btnCompact boardDemoteBtn"
                     onClick={() => onDemoteToWeek(item)}
-                    title="Move to This Week"
+                    title="Move to Next 7 days"
                   >
-                    ↓ Week
+                    ↓ 7d
                   </button>
                 ) : null}
                 {onDemoteToFuture ? (
@@ -253,18 +263,23 @@ function SortableBoardRow({
                     ↓ Later
                   </button>
                 ) : null}
-                <button
-                  type="button"
-                  className="rankBtn boardDeleteBtn"
+                <TaskNoteEditor
+                  note={item.note ?? null}
+                  taskTitle={item.title}
+                  onChange={(note) => onNoteChange(item.id, note)}
+                />
+                <ActionIconButton
+                  label={`Delete task: ${item.title}`}
                   onClick={() => {
                     if (window.confirm(`Delete "${item.title}"? This cannot be undone.`)) {
                       onDeleteTask(item.id);
                     }
                   }}
-                  aria-label={`Delete task: ${item.title}`}
+                  variant="danger"
+                  className="boardDeleteBtn"
                 >
-                  ×
-                </button>
+                  <DeleteIcon />
+                </ActionIconButton>
               </div>
             </div>
           </>
@@ -311,6 +326,63 @@ function SortableBoardRow({
   );
 }
 
+function DoneTodayList({
+  items,
+  today,
+  pillars,
+  milestones,
+  onToggleTask,
+  onDeadlineChange,
+  onPillarChange,
+  onMilestoneChange,
+  onScheduleChange,
+  onTitleChange,
+  onNoteChange,
+  onDeleteTask,
+  onDateLockChange,
+}: {
+  items: BoardItem[];
+  today: string;
+  pillars: MissionPillar[];
+  milestones: MissionMilestone[];
+  onToggleTask: (id: number, completed: boolean) => void;
+  onDeadlineChange: (id: number, deadline: string | null) => void;
+  onPillarChange: (id: number, pillarId: number | null) => void;
+  onMilestoneChange: (id: number, milestoneId: number | null) => void;
+  onScheduleChange: (id: number, mode: TaskScheduleMode) => void;
+  onTitleChange: (id: number, title: string) => void | Promise<void>;
+  onNoteChange: (id: number, note: string | null) => void | Promise<void>;
+  onDeleteTask: (id: number) => void;
+  onDateLockChange?: (id: number, locked: boolean, deadline: string | null) => void;
+}) {
+  return (
+    <SortableContext items={items.map((i) => i.key)} strategy={verticalListSortingStrategy}>
+      <ul className="comingUpList boardDropList missionDoneTodayList">
+        {items.map((item) => (
+          <SortableBoardRow
+            key={item.key}
+            item={item}
+            today={today}
+            pillars={pillars}
+            milestones={milestones}
+            listId={TODAY_LIST}
+            onToggleTask={onToggleTask}
+            onDeadlineChange={onDeadlineChange}
+            onPillarChange={onPillarChange}
+            onMilestoneChange={onMilestoneChange}
+            onScheduleChange={onScheduleChange}
+            onTitleChange={onTitleChange}
+            onNoteChange={onNoteChange}
+            onDeleteTask={onDeleteTask}
+            onDateLockChange={onDateLockChange}
+            hideDragHandle
+          />
+        ))}
+      </ul>
+    </SortableContext>
+  );
+}
+
 function BoardList({
   id,
   items,
@@ -323,6 +395,7 @@ function BoardList({
   onMilestoneChange,
   onScheduleChange,
   onTitleChange,
+  onNoteChange,
   onDeleteTask,
   onDateLockChange,
   onDemoteToWeek,
@@ -330,6 +403,7 @@ function BoardList({
   onPromoteToToday,
   emptyMessage,
   greatJob,
+  showCompletedInPlace = false,
 }: {
   id: string;
   items: BoardItem[];
@@ -342,6 +416,7 @@ function BoardList({
   onMilestoneChange: (id: number, milestoneId: number | null) => void;
   onScheduleChange: (id: number, mode: TaskScheduleMode) => void;
   onTitleChange: (id: number, title: string) => void | Promise<void>;
+  onNoteChange: (id: number, note: string | null) => void | Promise<void>;
   onDeleteTask: (id: number) => void;
   onDateLockChange?: (id: number, locked: boolean, deadline: string | null) => void;
   onDemoteToWeek?: (item: BoardItem) => void;
@@ -349,10 +424,15 @@ function BoardList({
   onPromoteToToday?: (item: BoardItem) => void;
   emptyMessage: string;
   greatJob?: string | null;
+  showCompletedInPlace?: boolean;
 }) {
   const { setNodeRef, isOver } = useDroppable({ id });
-  const visibleItems = openBoardItems(items);
-  const displayItems = visibleItems.length > 0 ? visibleItems : items;
+  const openItems = openBoardItems(items);
+  const displayItems = showCompletedInPlace
+    ? sortTodayWithCompletedAtBottom(items)
+    : openItems.length > 0
+      ? openItems
+      : items;
 
   return (
     <ul
@@ -379,6 +459,7 @@ function BoardList({
               onMilestoneChange={onMilestoneChange}
               onScheduleChange={onScheduleChange}
               onTitleChange={onTitleChange}
+              onNoteChange={onNoteChange}
               onDeleteTask={onDeleteTask}
               onDateLockChange={onDateLockChange}
               onDemoteToWeek={id === TODAY_LIST ? onDemoteToWeek : undefined}
@@ -396,6 +477,7 @@ export default function MissionBrief({
   today,
   boardToday,
   boardComingUp,
+  boardDoneToday = [],
   pillars,
   milestones,
   reflection,
@@ -408,6 +490,7 @@ export default function MissionBrief({
   onMilestoneChange,
   onScheduleChange,
   onTitleChange,
+  onNoteChange,
   onDeleteTask,
   onDateLockChange,
   onLayoutChange,
@@ -415,6 +498,7 @@ export default function MissionBrief({
   today: string;
   boardToday: BoardItem[];
   boardComingUp: BoardItem[];
+  boardDoneToday?: BoardItem[];
   pillars: MissionPillar[];
   milestones: MissionMilestone[];
   reflection?: MissionReflectionDisplay | null;
@@ -427,18 +511,22 @@ export default function MissionBrief({
   onMilestoneChange: (id: number, milestoneId: number | null) => void;
   onScheduleChange: (id: number, mode: TaskScheduleMode) => void;
   onTitleChange: (id: number, title: string) => void | Promise<void>;
+  onNoteChange: (id: number, note: string | null) => void | Promise<void>;
   onDeleteTask: (id: number) => void;
   onDateLockChange?: (id: number, locked: boolean, deadline: string | null) => void;
   onLayoutChange: (today: BoardItem[], comingUp: BoardItem[]) => void;
 }) {
   const [todayItems, setTodayItems] = useState(boardToday);
   const [comingUpItems, setComingUpItems] = useState(boardComingUp);
+  const [doneTodayItems, setDoneTodayItems] = useState(boardDoneToday);
+  const [doneTodayExpanded, setDoneTodayExpanded] = useState(false);
   const [activeId, setActiveId] = useState<string | null>(null);
 
   useEffect(() => {
-    setTodayItems(boardToday);
+    setTodayItems(sortTodayWithCompletedAtBottom(boardToday));
     setComingUpItems(sortComingUpByDate(boardComingUp));
-  }, [boardToday, boardComingUp]);
+    setDoneTodayItems(boardDoneToday);
+  }, [boardToday, boardComingUp, boardDoneToday]);
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
@@ -619,7 +707,7 @@ export default function MissionBrief({
               {headerAction}
             </div>
             <p className="sectionHint">
-              Drag ⠿ to reorder, use ↓ Week / ↓ Later to demote, or drag items to This Week.
+              Drag ⠿ to reorder, use ↓ 7d / ↓ Later to demote, or drag items to Next 7 days.
             </p>
             <BoardList
               id={TODAY_LIST}
@@ -633,21 +721,53 @@ export default function MissionBrief({
               onMilestoneChange={onMilestoneChange}
               onScheduleChange={onScheduleChange}
               onTitleChange={onTitleChange}
+              onNoteChange={onNoteChange}
               onDeleteTask={onDeleteTask}
               onDateLockChange={onDateLockChange}
               onDemoteToWeek={demoteToWeek}
               onDemoteToFuture={demoteToFuture}
               greatJob={greatJobMessage(todayItems, "today", today, calendarDay)}
               emptyMessage="Drag tasks here or use Check In above."
+              showCompletedInPlace
             />
+
+            {doneTodayItems.length > 0 ? (
+              <div className="missionDoneTodayWrap">
+                <button
+                  type="button"
+                  className="outlineButton missionDoneTodayToggle"
+                  onClick={() => setDoneTodayExpanded((v) => !v)}
+                  aria-expanded={doneTodayExpanded}
+                >
+                  {doneTodayExpanded ? "Hide" : "Show"} done today ({doneTodayItems.length})
+                </button>
+                {doneTodayExpanded ? (
+                  <DoneTodayList
+                    items={doneTodayItems}
+                    today={today}
+                    pillars={pillars}
+                    milestones={milestones}
+                    onToggleTask={onToggleTask}
+                    onDeadlineChange={onDeadlineChange}
+                    onPillarChange={onPillarChange}
+                    onMilestoneChange={onMilestoneChange}
+                    onScheduleChange={onScheduleChange}
+                    onTitleChange={onTitleChange}
+                    onNoteChange={onNoteChange}
+                    onDeleteTask={onDeleteTask}
+                    onDateLockChange={onDateLockChange}
+                  />
+                ) : null}
+              </div>
+            ) : null}
           </section>
         )}
 
         {view === "week" && (
           <section className="section">
-            <h2 className="sectionTitle">This Week</h2>
+            <h2 className="sectionTitle">Next 7 days</h2>
             <p className="sectionHint">
-              Deadlines and milestones this week — use ↑ Today to promote or drag within the list.
+              Deadlines in the rolling next week — use ↑ Today to promote or drag within the list.
             </p>
             <BoardList
               id={COMING_UP_LIST}
@@ -661,12 +781,13 @@ export default function MissionBrief({
               onMilestoneChange={onMilestoneChange}
               onScheduleChange={onScheduleChange}
               onTitleChange={onTitleChange}
+              onNoteChange={onNoteChange}
               onDeleteTask={onDeleteTask}
               onDateLockChange={onDateLockChange}
               onDemoteToFuture={demoteToFuture}
               onPromoteToToday={promoteToToday}
               greatJob={greatJobMessage(comingUpItems, "week", today, calendarDay)}
-              emptyMessage="Nothing scheduled for this week yet."
+              emptyMessage="Nothing scheduled in the next 7 days yet."
             />
           </section>
         )}

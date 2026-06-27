@@ -13,11 +13,17 @@ import {
   checkInEntryLabel,
   isCheckInLogKind,
 } from "../lib/check-in-log";
+import ActionIconButton, { DeleteIcon, EditIcon } from "./ActionIconButton";
 import {
   assistantChatEntryLabel,
   isAssistantChatLogKind,
   logKindShowsPillarTags,
 } from "../lib/assistant-chat-log";
+import { DAILY_LOG_CHANGED_EVENT } from "../lib/daily-log-events";
+import {
+  isWeeklySummaryLogKind,
+  weeklySummaryEntryLabel,
+} from "../lib/weekly-summary-log";
 import PillarChip from "./PillarChip";
 
 type Pillar = {
@@ -31,9 +37,10 @@ type Pillar = {
 type DailyLogEntry = {
   id: number;
   log_date: string;
-  kind: "went_well" | "went_poorly" | "daily_focus" | "assistant_chat";
+  kind: "went_well" | "went_poorly" | "daily_focus" | "assistant_chat" | "weekly_summary";
   content: string;
   pillar_ids?: number[];
+  week_monday?: string | null;
   created_at: string;
 };
 
@@ -41,13 +48,17 @@ const LEGACY_KIND_LABELS: Record<"went_poorly", string> = {
   went_poorly: "What didn't go well",
 };
 
-function entryKindLabel(kind: DailyLogEntry["kind"]): string {
-  if (isCheckInLogKind(kind)) return checkInEntryLabel(kind);
-  if (isAssistantChatLogKind(kind)) return assistantChatEntryLabel();
-  return LEGACY_KIND_LABELS[kind];
+function entryKindLabel(entry: DailyLogEntry): string {
+  if (isCheckInLogKind(entry.kind)) return checkInEntryLabel(entry.kind);
+  if (isAssistantChatLogKind(entry.kind)) return assistantChatEntryLabel();
+  if (isWeeklySummaryLogKind(entry.kind)) {
+    return weeklySummaryEntryLabel(entry.week_monday, entry.log_date);
+  }
+  return LEGACY_KIND_LABELS[entry.kind];
 }
 
 const KIND_ORDER: DailyLogEntry["kind"][] = [
+  "weekly_summary",
   ...CHECK_IN_KIND_ORDER,
   "assistant_chat",
   "went_poorly",
@@ -188,7 +199,7 @@ function LogEntryRow({
               <span className="dailyLogEntryKindHint">{checkInMeta.hint}</span>
             </>
           ) : (
-            <span className="dailyLogEntryKind">{entryKindLabel(entry.kind)}</span>
+            <span className="dailyLogEntryKind">{entryKindLabel(entry)}</span>
           )}
         </div>
         <time className="dailyLogEntryTime" dateTime={entry.created_at}>
@@ -226,27 +237,23 @@ function LogEntryRow({
             >
               Cancel
             </button>
-            <button
-              type="button"
-              className="btnCompact outlineButton"
+            <ActionIconButton
+              label="Delete entry"
               onClick={() => void remove()}
               disabled={busy}
+              variant="danger"
             >
-              {deleting ? "Deleting..." : "Delete"}
-            </button>
+              <DeleteIcon />
+            </ActionIconButton>
           </div>
         </>
       ) : (
         <>
           <p className="dailyLogEntryBody">{entry.content}</p>
           <div className="dailyLogEntryActions">
-            <button
-              type="button"
-              className="btnCompact outlineButton"
-              onClick={() => setEditing(true)}
-            >
-              Edit
-            </button>
+            <ActionIconButton label="Edit entry" onClick={() => setEditing(true)}>
+              <EditIcon />
+            </ActionIconButton>
           </div>
         </>
       )}
@@ -333,6 +340,16 @@ export default function DailyLogForm() {
 
   useEffect(() => {
     load(fromDate, toDate);
+  }, [fromDate, toDate, load]);
+
+  useEffect(() => {
+    const onDailyLogChanged = () => {
+      void load(fromDate, toDate);
+    };
+    window.addEventListener(DAILY_LOG_CHANGED_EVENT, onDailyLogChanged);
+    return () => {
+      window.removeEventListener(DAILY_LOG_CHANGED_EVENT, onDailyLogChanged);
+    };
   }, [fromDate, toDate, load]);
 
   function goToMonth(monthStart: Date) {

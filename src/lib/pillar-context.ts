@@ -50,6 +50,19 @@ export function formatPillarContextForPrompt(description: string | null | undefi
     .join("\n");
 }
 
+export function updatePillarContextAt(
+  description: string | null | undefined,
+  index: number,
+  text: string
+): string | null {
+  const entries = parsePillarContext(description);
+  if (index < 0 || index >= entries.length) return description?.trim() || null;
+  const trimmed = text.trim();
+  if (!trimmed) return description?.trim() || null;
+  entries[index] = { ...entries[index], text: trimmed };
+  return serializePillarContext(entries);
+}
+
 export function removePillarContextAt(
   description: string | null | undefined,
   index: number

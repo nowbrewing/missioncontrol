@@ -12,7 +12,7 @@ const MISSION_CONTROL_ABOUT = {
     },
     {
       label: "Co-Pilot Accountability",
-      text: "Get real-time coaching and strategic pushback when you're overloading your schedule.",
+      text: "Get real-time assistance and strategic pushback when you're overloading your schedule.",
     },
     {
       label: "The Orbital View",

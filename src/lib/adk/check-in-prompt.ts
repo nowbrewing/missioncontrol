@@ -10,11 +10,11 @@ Each task object must have:
 - title (string)
 - pillar (string — use a pillar name from SYSTEM CONTEXT)
 - deadline (YYYY-MM-DD string or null)
-- bucket ("Today" | "This Week" | "Later")
+- bucket ("Today" | "Next 7 days" | "Later")
 
 Example:
 \`\`\`json
-[{"title":"Book dentist","pillar":"Health","deadline":"2026-06-12","bucket":"This Week"}]
+[{"title":"Book dentist","pillar":"Health","deadline":"2026-06-12","bucket":"Next 7 days"}]
 \`\`\`
 
 Do not call MCP tools during this check-in. The user will review and confirm new tasks in the app first.`;

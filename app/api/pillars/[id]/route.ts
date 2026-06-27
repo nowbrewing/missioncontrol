@@ -3,7 +3,13 @@ import { requireSessionUser } from "../../../../src/lib/auth";
 import { normalizePillarAbbreviationInput } from "../../../../src/lib/pillar-abbreviation";
 import { isValidPillarColor, normalizePillarColor } from "../../../../src/lib/pillar-colors";
 import {
+  parsePillarNoteFieldDefs,
+  parsePillarNoteFieldValues,
+  prunePillarNoteFieldValues,
+} from "../../../../src/lib/pillar-note-fields";
+import {
   deletePillar,
+  listPillars,
   updatePillar,
 } from "../../../../src/lib/mongodb/store/users";
 
@@ -21,6 +27,9 @@ export const PATCH = async (req: Request, { params }: Params) => {
     const body = (await req.json()) as {
       name?: string;
       description?: string | null;
+      calendar_note?: string | null;
+      note_fields?: unknown;
+      note_field_values?: unknown;
       abbreviation?: string | null;
       color?: string;
     };
@@ -31,6 +40,9 @@ export const PATCH = async (req: Request, { params }: Params) => {
     const patch: Partial<{
       name: string;
       description: string | null;
+      calendarNote: string | null;
+      noteFields: ReturnType<typeof parsePillarNoteFieldDefs>;
+      noteFieldValues: ReturnType<typeof parsePillarNoteFieldValues>;
       color: string;
       abbreviation: string | null;
     }> = {};
@@ -45,6 +57,30 @@ export const PATCH = async (req: Request, { params }: Params) => {
     if (body.description !== undefined) {
       patch.description =
         typeof body.description === "string" ? body.description.trim() || null : null;
+    }
+    if (body.calendar_note !== undefined) {
+      patch.calendarNote =
+        typeof body.calendar_note === "string" ? body.calendar_note.trim() || null : null;
+    }
+    if (body.note_fields !== undefined) {
+      patch.noteFields = parsePillarNoteFieldDefs(body.note_fields);
+    }
+
+    const needsNoteFieldContext =
+      body.note_fields !== undefined || body.note_field_values !== undefined;
+    const existingPillar = needsNoteFieldContext
+      ? (await listPillars(user.id)).find((p) => p.id === pillarId)
+      : undefined;
+
+    if (body.note_field_values !== undefined) {
+      const defs =
+        patch.noteFields ?? parsePillarNoteFieldDefs(existingPillar?.note_fields);
+      patch.noteFieldValues = parsePillarNoteFieldValues(body.note_field_values, defs);
+    } else if (body.note_fields !== undefined && existingPillar) {
+      patch.noteFieldValues = prunePillarNoteFieldValues(
+        (existingPillar.note_field_values ?? {}) as Record<string, string>,
+        patch.noteFields ?? []
+      );
     }
     if (body.color !== undefined) {
       patch.color = normalizePillarColor(body.color);

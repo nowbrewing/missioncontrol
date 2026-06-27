@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import ActionIconButton, { DeleteIcon } from "./ActionIconButton";
 import TaskPillarSelect from "./TaskPillarSelect";
 import { isYyyyMmDd } from "../lib/date";
 
@@ -10,7 +11,7 @@ export type ProposedTaskDraft = {
   pillar_id: number | null;
   pillar: string;
   deadline: string | null;
-  bucket: "Today" | "This Week" | "Later";
+  bucket: "Today" | "Next 7 days" | "Later";
 };
 
 type Pillar = {
@@ -25,6 +26,8 @@ export default function ProposedTasksReviewModal({
   pillars,
   planDate,
   saving,
+  source = "check-in",
+  saveError,
   onConfirm,
   onDismiss,
 }: {
@@ -32,6 +35,8 @@ export default function ProposedTasksReviewModal({
   pillars: Pillar[];
   planDate: string;
   saving: boolean;
+  source?: "check-in" | "chat";
+  saveError?: string | null;
   onConfirm: (tasks: ProposedTaskDraft[]) => void;
   onDismiss: () => void;
 }) {
@@ -68,9 +73,9 @@ export default function ProposedTasksReviewModal({
           Review new tasks
         </h2>
         <p className="modalNote">
-          The Life Agent found {tasks.length} new task{tasks.length === 1 ? "" : "s"} from
-          your check-in. Edit anything that looks off, remove what you don&apos;t want, then
-          add the rest to your board.
+          {source === "chat"
+            ? `The assistant found ${tasks.length} new task${tasks.length === 1 ? "" : "s"} from your chat. Edit anything that looks off, remove what you don't want, then add the rest to your board.`
+            : `The Life Agent found ${tasks.length} new task${tasks.length === 1 ? "" : "s"} from your check-in. Edit anything that looks off, remove what you don't want, then add the rest to your board.`}
         </p>
 
         {tasks.length === 0 ? (
@@ -82,15 +87,15 @@ export default function ProposedTasksReviewModal({
                 <div className="proposedTaskCardHead">
                   <span className="pill pillNew">New</span>
                   <span className="pill pillSubtle">{task.bucket}</span>
-                  <button
-                    type="button"
-                    className="rankBtn proposedTaskRemoveBtn"
+                  <ActionIconButton
+                    label={`Remove ${task.title}`}
                     onClick={() => removeTask(task.localId)}
                     disabled={saving}
-                    aria-label={`Remove ${task.title}`}
+                    variant="danger"
+                    className="proposedTaskRemoveBtn"
                   >
-                    ×
-                  </button>
+                    <DeleteIcon />
+                  </ActionIconButton>
                 </div>
 
                 <div className="modalField">
@@ -137,6 +142,13 @@ export default function ProposedTasksReviewModal({
               </li>
             ))}
           </ul>
+        )}
+
+        {saveError && (
+          <div className="chatErrorBox">
+            <strong>Could not save tasks</strong>
+            <p className="chatError">{saveError}</p>
+          </div>
         )}
 
         <div className="modalActions">

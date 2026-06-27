@@ -1,6 +1,7 @@
 import { getMongoDb } from "../client";
 import { nextLegacyId } from "../ids";
 import { toSqlDatetime } from "../serialize";
+import { isYyyyMmDd } from "../../date";
 import {
   COLLECTIONS,
   type DailyLogKind,
@@ -15,6 +16,7 @@ export type DailyLogEntry = {
   kind: DailyLogKind;
   content: string;
   pillar_ids: number[];
+  week_monday: string | null;
   created_at: string;
 };
 
@@ -25,6 +27,7 @@ function entryToRow(e: MongoDailyLogEntry): DailyLogEntry {
     kind: e.kind,
     content: e.content,
     pillar_ids: e.pillarIds ?? [],
+    week_monday: e.weekMonday ?? null,
     created_at: toSqlDatetime(e.createdAt),
   };
 }
@@ -145,7 +148,8 @@ export async function appendDailyLogEntry(
   logDate: string,
   kind: DailyLogKind,
   content: string,
-  pillarIds?: number[]
+  pillarIds?: number[],
+  weekMonday?: string
 ): Promise<DailyLogEntry> {
   const text = content.trim();
   if (!text) throw new Error("Entry content is required");
@@ -161,6 +165,7 @@ export async function appendDailyLogEntry(
     kind,
     content: text,
     ...(normalizedPillarIds.length > 0 ? { pillarIds: normalizedPillarIds } : {}),
+    ...(weekMonday && isYyyyMmDd(weekMonday) ? { weekMonday } : {}),
     createdAt: new Date(),
   };
   await db.collection<MongoDailyLogEntry>(COLLECTIONS.daily_log_entries).insertOne(doc);

@@ -16,6 +16,7 @@ const TAGGED_KINDS = new Set<DailyLogKind>([
   "went_well",
   "daily_focus",
   "assistant_chat",
+  "weekly_summary",
 ]);
 
 export async function PATCH(req: Request, context: RouteContext) {

@@ -42,6 +42,60 @@ function isoYyyyMmDdFromDate(d: Date) {
   return `${yyyy}-${mm}-${dd}`;
 }
 
+export type CalendarDayCell = {
+  date: string;
+  inMonth: boolean;
+};
+
+/** Monday-first month grid (6 rows × 7 columns). */
+export function buildMonthGrid(year: number, month: number): CalendarDayCell[] {
+  const first = new Date(year, month, 1);
+  const lastDay = new Date(year, month + 1, 0).getDate();
+  const startPad = (first.getDay() + 6) % 7;
+
+  const grid: CalendarDayCell[] = [];
+
+  for (let i = startPad - 1; i >= 0; i--) {
+    const d = new Date(year, month, -i);
+    grid.push({ date: isoYyyyMmDdFromDate(d), inMonth: false });
+  }
+
+  for (let day = 1; day <= lastDay; day++) {
+    grid.push({ date: isoYyyyMmDdFromDate(new Date(year, month, day)), inMonth: true });
+  }
+
+  while (grid.length % 7 !== 0) {
+    const tail = grid[grid.length - 1].date;
+    grid.push({ date: addDaysIsoYyyyMmDd(tail, 1), inMonth: false });
+  }
+
+  while (grid.length < 42) {
+    const tail = grid[grid.length - 1].date;
+    grid.push({ date: addDaysIsoYyyyMmDd(tail, 1), inMonth: false });
+  }
+
+  return grid;
+}
+
+export function parseMonthParam(value: string | null | undefined): { year: number; month: number } {
+  if (value && /^\d{4}-\d{2}$/.test(value)) {
+    const [y, m] = value.split("-").map(Number);
+    if (m >= 1 && m <= 12) return { year: y, month: m - 1 };
+  }
+  const now = new Date();
+  return { year: now.getFullYear(), month: now.getMonth() };
+}
+
+export function monthParamFromDate(year: number, month: number) {
+  return `${year}-${String(month + 1).padStart(2, "0")}`;
+}
+
+export const WEEKDAY_LABELS_MON = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"] as const;
+
+export function dayOfMonthFromIso(date: string) {
+  return Number(date.slice(8, 10));
+}
+
 export function monthBoundsFor(date = new Date()) {
   const year = date.getFullYear();
   const month = date.getMonth();

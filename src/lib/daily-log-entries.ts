@@ -13,6 +13,7 @@ export const DAILY_LOG_KINDS = [
   "went_poorly",
   "daily_focus",
   "assistant_chat",
+  "weekly_summary",
 ] as const;
 export type DailyLogKind = (typeof DAILY_LOG_KINDS)[number];
 
@@ -26,6 +27,7 @@ export function groupEntriesByKind(entries: DailyLogEntry[]): DailyLogByKind {
     went_poorly: [],
     daily_focus: [],
     assistant_chat: [],
+    weekly_summary: [],
   };
   for (const entry of entries) {
     if (entry.kind in byKind) byKind[entry.kind].push(entry);
@@ -47,22 +49,35 @@ export async function appendDailyLogEntry(
   logDate: string,
   kind: DailyLogKind,
   content: string,
-  pillarIds?: number[]
+  pillarIds?: number[],
+  weekMonday?: string
 ): Promise<DailyLogEntry> {
-  return mongoAppendDailyLogEntry(userId, logDate, kind, content, pillarIds);
+  return mongoAppendDailyLogEntry(userId, logDate, kind, content, pillarIds, weekMonday);
 }
 
 export async function appendDailyLogEntries(
   userId: number,
   logDate: string,
-  items: { kind: DailyLogKind; content: string; pillar_ids?: number[] }[]
+  items: {
+    kind: DailyLogKind;
+    content: string;
+    pillar_ids?: number[];
+    week_monday?: string;
+  }[]
 ): Promise<DailyLogEntry[]> {
   const created: DailyLogEntry[] = [];
   for (const item of items) {
     const text = item.content.trim();
     if (!text) continue;
     created.push(
-      await appendDailyLogEntry(userId, logDate, item.kind, text, item.pillar_ids)
+      await appendDailyLogEntry(
+        userId,
+        logDate,
+        item.kind,
+        text,
+        item.pillar_ids,
+        item.week_monday
+      )
     );
   }
   return created;
@@ -124,6 +139,7 @@ export async function buildDailyLogAggregate(userId: number, logDate: string) {
       went_poorly: combineEntryText(by_kind.went_poorly),
       daily_focus: combineEntryText(by_kind.daily_focus),
       assistant_chat: combineEntryText(by_kind.assistant_chat),
+      weekly_summary: combineEntryText(by_kind.weekly_summary),
     },
   };
 }

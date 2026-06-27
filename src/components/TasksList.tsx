@@ -2,8 +2,11 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { PillarHeaderBar } from "./PillarChip";
+import ActionIconButton, { DeleteIcon } from "./ActionIconButton";
 import TaskCardMeta from "./TaskCardMeta";
 import TaskDeadlineEditor from "./TaskDeadlineEditor";
+import TaskNoteEditor from "./TaskNoteEditor";
+import TaskPillarSelect from "./TaskPillarSelect";
 import TaskTitleEditor from "./TaskTitleEditor";
 import { scheduleTypeFromMode } from "./TaskScheduleSelect";
 import type { TaskScheduleMode } from "./TaskScheduleSelect";
@@ -13,6 +16,7 @@ type Task = {
   id: number;
   title: string;
   description: string | null;
+  note: string | null;
   deadline: string | null;
   completed_at: string | null;
   rank: number;
@@ -49,6 +53,10 @@ export default function TasksList({
   const [milestones, setMilestones] = useState<Milestone[]>([]);
   const [newTitle, setNewTitle] = useState("");
   const [newDeadline, setNewDeadline] = useState("");
+  const [newPillarId, setNewPillarId] = useState<number | null>(null);
+  const [pillarDrafts, setPillarDrafts] = useState<
+    Record<number, { title: string; deadline: string }>
+  >({});
   const [loading, setLoading] = useState(true);
 
   const pillarMap = useMemo(
@@ -75,17 +83,54 @@ export default function TasksList({
     load();
   }, [load]);
 
-  async function addTask() {
+  async function addTask(pillarId: number | null = newPillarId) {
     const title = newTitle.trim();
     if (!title) return;
     await fetch("/api/tasks", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ title, deadline: newDeadline || null }),
+      body: JSON.stringify({
+        title,
+        deadline: newDeadline || null,
+        pillar_id: pillarId,
+      }),
     });
     setNewTitle("");
     setNewDeadline("");
     await load();
+  }
+
+  async function addTaskForPillar(pillarId: number) {
+    const draft = pillarDrafts[pillarId] ?? { title: "", deadline: "" };
+    const title = draft.title.trim();
+    if (!title) return;
+    await fetch("/api/tasks", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        title,
+        deadline: draft.deadline || null,
+        pillar_id: pillarId,
+      }),
+    });
+    setPillarDrafts((prev) => ({
+      ...prev,
+      [pillarId]: { title: "", deadline: "" },
+    }));
+    await load();
+  }
+
+  function updatePillarDraft(
+    pillarId: number,
+    patch: Partial<{ title: string; deadline: string }>
+  ) {
+    setPillarDrafts((prev) => {
+      const current = prev[pillarId] ?? { title: "", deadline: "" };
+      return {
+        ...prev,
+        [pillarId]: { ...current, ...patch },
+      };
+    });
   }
 
   async function toggleTask(id: number, completed: boolean) {
@@ -182,6 +227,16 @@ export default function TasksList({
     }
   }
 
+  async function updateNote(id: number, note: string | null) {
+    applyTaskPatch(id, { note });
+    try {
+      await patchTask(id, { note });
+    } catch {
+      await load();
+      throw new Error("Could not save task note");
+    }
+  }
+
   const visible = showCompleted ? tasks : tasks.filter((t) => !t.completed_at);
 
   if (loading) return <p className="subtitle">Loading tasks...</p>;
@@ -226,14 +281,18 @@ export default function TasksList({
             onScheduleChange={(mode) => updateSchedule(task.id, mode)}
           />
           <div className="taskCardActions">
-            <button
-              type="button"
-              className="rankBtn"
+            <TaskNoteEditor
+              note={task.note}
+              taskTitle={task.title}
+              onChange={(note) => updateNote(task.id, note)}
+            />
+            <ActionIconButton
+              label="Delete task"
               onClick={() => deleteTask(task.id)}
-              aria-label="Delete task"
+              variant="danger"
             >
-              ×
-            </button>
+              <DeleteIcon />
+            </ActionIconButton>
           </div>
         </div>
       </li>
@@ -255,7 +314,12 @@ export default function TasksList({
             placeholder="New chore or task"
             value={newTitle}
             onChange={(e) => setNewTitle(e.target.value)}
-            onKeyDown={(e) => e.key === "Enter" && addTask()}
+            onKeyDown={(e) => e.key === "Enter" && void addTask()}
+          />
+          <TaskPillarSelect
+            pillars={pillars}
+            value={newPillarId}
+            onChange={setNewPillarId}
           />
           <input
             className="invInput invInputDate"
@@ -264,27 +328,62 @@ export default function TasksList({
             onChange={(e) => setNewDeadline(e.target.value)}
             title="Deadline (optional)"
           />
-          <button type="button" className="outlineButton" onClick={addTask}>
+          <button type="button" className="outlineButton" onClick={() => void addTask()}>
             Add
           </button>
         </div>
 
-        {grouped.map(({ pillar, rank, tasks: pillarTasks }) =>
-          pillarTasks.length > 0 ? (
+        {grouped.map(({ pillar, rank, tasks: pillarTasks }) => {
+          const draft = pillarDrafts[pillar.id] ?? { title: "", deadline: "" };
+          return (
             <section
               key={pillar.id}
               className="section taskPillarGroup"
               style={pillarColorVars(pillar.color)}
             >
               <PillarHeaderBar name={pillar.name} color={pillar.color} rank={rank} />
-              <ul className="taskList">{pillarTasks.map(renderTask)}</ul>
+              <div className="inlineForm taskPillarAddForm">
+                <input
+                  className="invInput"
+                  placeholder={`Add task to ${pillar.name}`}
+                  value={draft.title}
+                  onChange={(e) =>
+                    updatePillarDraft(pillar.id, { title: e.target.value })
+                  }
+                  onKeyDown={(e) =>
+                    e.key === "Enter" && void addTaskForPillar(pillar.id)
+                  }
+                />
+                <input
+                  className="invInput invInputDate"
+                  type="date"
+                  value={draft.deadline}
+                  onChange={(e) =>
+                    updatePillarDraft(pillar.id, { deadline: e.target.value })
+                  }
+                  title="Deadline (optional)"
+                />
+                <button
+                  type="button"
+                  className="outlineButton"
+                  onClick={() => void addTaskForPillar(pillar.id)}
+                  disabled={!draft.title.trim()}
+                >
+                  Add
+                </button>
+              </div>
+              {pillarTasks.length > 0 ? (
+                <ul className="taskList">{pillarTasks.map(renderTask)}</ul>
+              ) : (
+                <p className="sectionHint">No tasks in this pillar yet.</p>
+              )}
             </section>
-          ) : null
-        )}
+          );
+        })}
 
         {visible.length === 0 && (
           <div className="card">
-            <span style={{ opacity: 0.8 }}>No tasks yet.</span>
+            <span style={{ opacity: 0.8 }}>No tasks yet — add one above or in a pillar.</span>
           </div>
         )}
       </div>
@@ -299,7 +398,7 @@ export default function TasksList({
           placeholder="New chore or task"
           value={newTitle}
           onChange={(e) => setNewTitle(e.target.value)}
-          onKeyDown={(e) => e.key === "Enter" && addTask()}
+          onKeyDown={(e) => e.key === "Enter" && void addTask()}
         />
         <input
           className="invInput invInputDate"
@@ -308,7 +407,7 @@ export default function TasksList({
           onChange={(e) => setNewDeadline(e.target.value)}
           title="Deadline (optional)"
         />
-        <button type="button" className="outlineButton" onClick={addTask}>
+        <button type="button" className="outlineButton" onClick={() => void addTask()}>
           Add
         </button>
       </div>

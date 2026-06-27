@@ -36,7 +36,7 @@ a {
 }
 
 .topbar-inner {
-  max-width: 960px;
+  max-width: 1100px;
   margin: 0 auto;
   padding: 12px 16px;
 }
@@ -697,6 +697,20 @@ a.outlineButton {
   gap: 12px;
   font-size: 14px;
   font-weight: 600;
+}
+
+.topbarNavLink {
+  opacity: 0.72;
+}
+
+.topbarNavLink:hover {
+  opacity: 1;
+}
+
+.topbarNavLinkActive {
+  opacity: 1;
+  text-decoration: underline;
+  text-underline-offset: 4px;
 }
 
 .authForm {
@@ -2217,6 +2231,13 @@ a.outlineButton {
   border-style: dashed;
 }
 
+.missionDoneTodayWrap {
+  margin-top: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
 .missionTab {
   border: 1px solid #000000;
   background: #ffffff;
@@ -2440,14 +2461,7 @@ a.outlineButton {
 }
 
 .pillarContextRemove {
-  border: 1px solid #8a1f1f;
-  border-radius: 8px;
-  padding: 2px 8px;
-  font-size: 12px;
-  font-weight: 600;
-  color: #8a1f1f;
-  background: #ffffff;
-  cursor: pointer;
+  margin-left: auto;
   flex-shrink: 0;
 }
 
@@ -2566,8 +2580,6 @@ a.outlineButton {
 
 .milestoneDeleteBtn {
   margin-left: auto;
-  color: #8a1f1f;
-  border-color: rgba(138, 31, 31, 0.35);
 }
 
 .pillarColorPicker {
@@ -2753,12 +2765,47 @@ a.outlineButton {
   padding: 0;
   display: grid;
   gap: 10px;
+  min-width: 0;
 }
 
 .recurringChecklistItem,
 .recurringSetupItem {
   padding: 12px;
   min-width: 0;
+}
+
+.recurringChecklistItem {
+  display: grid;
+  gap: 8px;
+}
+
+.recurringChecklistItemTop {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px 10px;
+  align-items: start;
+  min-width: 0;
+}
+
+.recurringChecklistDragHandle {
+  width: 32px;
+  height: 32px;
+  flex-shrink: 0;
+}
+
+.recurringChecklistMeta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.recurringChecklistMeta .pill {
+  max-width: 100%;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 .missionChecklistAside .recurringCircle {
@@ -2778,10 +2825,13 @@ a.outlineButton {
 }
 
 .recurringChecklistTitle {
-  flex: 1 1 100%;
+  display: block;
   min-width: 0;
+  max-width: 100%;
   font-size: 15px;
+  overflow-wrap: anywhere;
   word-break: break-word;
+  white-space: normal;
 }
 
 .recurringChecklistHead .pill {
@@ -2960,5 +3010,1577 @@ a.outlineButton {
 
 .recurringChecklistEmpty {
   padding: 16px;
+}
+
+.chatModeBadge {
+  flex-shrink: 0;
+  align-self: flex-start;
+  margin-top: 10px;
+  padding: 3px 8px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  color: rgba(0, 0, 0, 0.62);
+  background: rgba(0, 0, 0, 0.06);
+  border: 1px solid rgba(0, 0, 0, 0.1);
+}
+
+.chatModeHintCode {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 0.92em;
+  padding: 1px 5px;
+  border-radius: 4px;
+  background: rgba(0, 0, 0, 0.06);
+}
+
+.chatFormInputRow {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  flex: 1;
+  min-width: 0;
+}
+
+.chatFormInputRow .chatInput {
+  flex: 1;
+  min-width: 0;
+}
+
+.floatingChatFab {
+  position: fixed;
+  right: 20px;
+  bottom: 20px;
+  z-index: 1200;
+  width: 56px;
+  height: 56px;
+  border: none;
+  border-radius: 999px;
+  background: #111;
+  color: #fff;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.22);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: transform 0.15s ease, background 0.15s ease;
+}
+
+.floatingChatFab:hover {
+  transform: translateY(-2px);
+  background: #222;
+}
+
+.floatingChatFab:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.floatingChatFabOpen {
+  background: #333;
+}
+
+.floatingChatFabIcon {
+  font-size: 22px;
+  line-height: 1;
+}
+
+.floatingChatBackdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 1190;
+  border: none;
+  background: rgba(0, 0, 0, 0.2);
+  cursor: pointer;
+}
+
+.floatingChatPanel {
+  position: fixed;
+  right: 20px;
+  bottom: 88px;
+  z-index: 1200;
+  width: min(420px, calc(100vw - 32px));
+  max-height: min(72vh, 640px);
+  display: flex;
+  flex-direction: column;
+  border: 1px solid rgba(0, 0, 0, 0.12);
+  border-radius: 16px;
+  background: #fff;
+  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.18);
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(12px) scale(0.98);
+  transition: opacity 0.18s ease, transform 0.18s ease;
+}
+
+.floatingChatPanelOpen {
+  opacity: 1;
+  pointer-events: auto;
+  transform: translateY(0) scale(1);
+}
+
+.floatingChatPanelExpanded {
+  inset: 0;
+  right: 0;
+  left: 0;
+  bottom: 0;
+  width: auto;
+  max-height: none;
+  height: 100dvh;
+  border-radius: 0;
+  z-index: 1300;
+  transform: none;
+}
+
+.floatingChatPanelExpanded .floatingChatPanelBody {
+  flex: 1;
+  min-height: 0;
+}
+
+.floatingChatPanelExpanded .floatingChatMessages {
+  max-height: none;
+  flex: 1;
+}
+
+.floatingChatPanelHeaderActions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
+.floatingChatExpandBtn {
+  border: 1px solid rgba(0, 0, 0, 0.15);
+  border-radius: 8px;
+  padding: 4px 10px;
+  font-size: 12px;
+  font-weight: 600;
+  background: #fff;
+  cursor: pointer;
+}
+
+.floatingChatExpandBtn:hover {
+  background: rgba(0, 0, 0, 0.04);
+}
+
+.floatingChatExpandBtn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.floatingChatPanelHeader {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 14px 16px 10px;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.08);
+  flex-shrink: 0;
+}
+
+.floatingChatPanelTitleWrap {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.floatingChatPanelTitle {
+  margin: 0;
+  font-size: 17px;
+  font-weight: 800;
+}
+
+.floatingChatCloseBtn {
+  flex-shrink: 0;
+  width: 32px;
+  height: 32px;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  font-size: 22px;
+  line-height: 1;
+  cursor: pointer;
+  color: rgba(0, 0, 0, 0.55);
+}
+
+.floatingChatCloseBtn:hover {
+  background: rgba(0, 0, 0, 0.06);
+}
+
+.floatingChatCloseBtn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.floatingChatPanelBody {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 14px 16px 16px;
+  overflow: hidden;
+  min-height: 0;
+}
+
+.floatingChatSubtext {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.45;
+  color: rgba(0, 0, 0, 0.58);
+}
+
+.floatingChatMessages {
+  flex: 1;
+  min-height: 180px;
+  max-height: min(42vh, 360px);
+  overflow-y: auto;
+  padding-right: 4px;
+}
+
+.floatingChatEmptyHint {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.5;
+  color: rgba(0, 0, 0, 0.45);
+  font-style: italic;
+}
+
+.floatingChatForm {
+  flex-shrink: 0;
+}
+
+.floatingChatInput {
+  background: rgba(255, 255, 255, 0.92);
+}
+
+@media (max-width: 480px) {
+  .floatingChatFab {
+    right: 14px;
+    bottom: 14px;
+  }
+
+  .floatingChatPanel {
+    right: 12px;
+    left: 12px;
+    width: auto;
+    bottom: 80px;
+  }
+}
+
+.containerThinkpad {
+  max-width: 820px;
+  display: flex;
+  flex-direction: column;
+  min-height: calc(100vh - 120px);
+}
+
+.thinkpadLayout {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+  gap: 12px;
+  border: 1px solid rgba(0, 0, 0, 0.12);
+  border-radius: 14px;
+  padding: 14px 16px 16px;
+  background: rgba(255, 255, 255, 0.6);
+}
+
+.thinkpadToolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  flex-shrink: 0;
+}
+
+.thinkpadToolbarHint {
+  margin: 0;
+  flex: 1;
+  min-width: 200px;
+  font-size: 13px;
+  line-height: 1.45;
+  color: rgba(0, 0, 0, 0.58);
+}
+
+.thinkpadToolbarActions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-shrink: 0;
+}
+
+.thinkpadToolbarBtn {
+  border: 1px solid rgba(0, 0, 0, 0.2);
+  border-radius: 10px;
+  padding: 8px 14px;
+  font-size: 14px;
+  font-weight: 600;
+  background: #fff;
+  cursor: pointer;
+}
+
+.thinkpadToolbarBtn:hover:not(:disabled) {
+  background: rgba(0, 0, 0, 0.04);
+}
+
+.thinkpadToolbarBtn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.thinkpadToolbarBtnPrimary {
+  background: #111;
+  color: #fff;
+  border-color: #111;
+}
+
+.thinkpadToolbarBtnPrimary:hover:not(:disabled) {
+  background: #222;
+}
+
+.thinkpadMessages {
+  flex: 1;
+  min-height: 280px;
+  max-height: min(58vh, 640px);
+  overflow-y: auto;
+  padding: 4px 2px;
+  -webkit-overflow-scrolling: touch;
+}
+
+.thinkpadEmptyHint {
+  margin: 0;
+  padding: 24px 8px;
+  font-size: 14px;
+  line-height: 1.5;
+  color: rgba(0, 0, 0, 0.48);
+  font-style: italic;
+}
+
+.thinkpadForm {
+  flex-shrink: 0;
+  margin: 0;
+  position: static;
+}
+
+.thinkpadInput {
+  min-height: 88px;
+}
+
+.thinkpadErrorBox {
+  flex-shrink: 0;
+  margin: 0;
+}
+
+.thinkpadSaveModal {
+  max-width: 560px;
+}
+
+.thinkpadSummaryInput {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 12px 14px;
+  border: 1px solid rgba(0, 0, 0, 0.2);
+  border-radius: 10px;
+  font-size: 15px;
+  font-family: inherit;
+  line-height: 1.45;
+  resize: vertical;
+  margin-bottom: 16px;
+}
+
+.thinkpadTargetFieldset {
+  border: none;
+  margin: 0 0 16px;
+  padding: 0;
+}
+
+.thinkpadTargetOptions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px 16px;
+  margin-top: 8px;
+}
+
+.thinkpadTargetOption {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 14px;
+  cursor: pointer;
+}
+
+.thinkpadSelect {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 10px 12px;
+  border: 1px solid rgba(0, 0, 0, 0.2);
+  border-radius: 10px;
+  font-size: 15px;
+  font-family: inherit;
+  margin-bottom: 16px;
+  background: #fff;
+}
+
+.correctionReviewModal {
+  max-width: 640px;
+  max-height: 85vh;
+  overflow: auto;
+}
+
+.correctionReviewList {
+  list-style: none;
+  margin: 0 0 16px;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.correctionReviewItem {
+  border: 1px solid rgba(0, 0, 0, 0.1);
+  border-radius: 10px;
+  padding: 12px 14px;
+}
+
+.correctionReviewMeta {
+  margin: 0 0 6px;
+  font-size: 12px;
+  font-family: ui-monospace, monospace;
+  color: rgba(0, 0, 0, 0.55);
+}
+
+.correctionReviewReason {
+  margin: 0 0 10px;
+  font-size: 14px;
+  color: rgba(0, 0, 0, 0.7);
+}
+
+.correctionReviewDiff {
+  display: grid;
+  gap: 10px;
+}
+
+.correctionReviewDiff p {
+  margin: 4px 0 0;
+  font-size: 14px;
+  line-height: 1.45;
+  white-space: pre-wrap;
+}
+
+.correctionReviewLabel {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: rgba(0, 0, 0, 0.5);
+}
+
+.chatMarkdown {
+  font-size: 15px;
+  line-height: 1.4;
+}
+
+.chatMarkdown h2 {
+  font-size: 0.95rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  margin: 0 0 6px;
+  padding-bottom: 4px;
+  border-bottom: 2px solid rgba(0, 0, 0, 0.12);
+}
+
+.chatMarkdown ul {
+  margin: 0 0 8px;
+  padding-left: 1.1rem;
+}
+
+.chatMarkdown li {
+  margin: 1px 0;
+}
+
+.chatMarkdown li + li {
+  margin-top: 0;
+}
+
+.chatMarkdown hr {
+  border: none;
+  border-top: 1px solid rgba(0, 0, 0, 0.14);
+  margin: 10px 0;
+}
+
+.chatMarkdown p {
+  margin: 0 0 8px;
+}
+
+.chatMarkdown p strong {
+  display: block;
+  margin-top: 6px;
+  margin-bottom: 2px;
+}
+
+.chatMarkdown p strong:first-child {
+  margin-top: 0;
+}
+
+.reflectionRecapKickoff .chatMarkdown h2:first-of-type {
+  color: #1b6b3a;
+  border-bottom-color: rgba(27, 107, 58, 0.35);
+  margin-top: 6px;
+}
+
+.reflectionRecapKickoff .chatMarkdown h2:nth-of-type(2) {
+  color: #9a3412;
+  border-bottom-color: rgba(154, 52, 18, 0.35);
+}
+
+.reflectionRecapKickoff .chatMarkdown h3 {
+  font-size: 0.9rem;
+  font-weight: 600;
+  margin: 6px 0 2px;
+  line-height: 1.3;
+}
+
+.reflectionRecapKickoff .chatMarkdown h3:first-of-type {
+  margin-top: 0;
+}
+
+.reflectionRecapKickoff .chatMarkdown ul {
+  margin: 0 0 4px;
+}
+
+.reflectionRecapKickoff .chatMarkdown em {
+  display: block;
+  margin-top: 0;
+  font-style: normal;
+  color: rgba(0, 0, 0, 0.72);
+  line-height: 1.45;
+}
+
+.reflectionRecapKickoff.chatBubbleAssistant {
+  padding-top: 12px;
+  padding-bottom: 12px;
+}
+
+/* Pillar calendar */
+.containerCalendar {
+  max-width: 1280px;
+}
+
+.planningPageHeader {
+  margin-bottom: 4px;
+}
+
+.planningPageTitle {
+  margin-bottom: 8px;
+}
+
+.planningPageSubtitle {
+  margin-bottom: 16px;
+}
+
+.planningMonthHeader {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 16px;
+  text-align: center;
+}
+
+.planningPillarBar {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 14px 16px;
+  border: 1px solid rgba(0, 0, 0, 0.12);
+  border-radius: 12px;
+  background: rgba(0, 0, 0, 0.02);
+}
+
+.planningFilterLabel {
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  opacity: 0.72;
+}
+
+.planningPillarPicker {
+  position: relative;
+  width: 100%;
+}
+
+.planningPillarPickerTrigger {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  width: 100%;
+  border: none;
+  background: none;
+  padding: 0;
+  margin: 0;
+  cursor: pointer;
+  color: inherit;
+  text-align: left;
+}
+
+.planningPillarPickerTrigger:hover {
+  opacity: 0.88;
+}
+
+.planningPillarPickerName {
+  font-size: 40px;
+  line-height: 1.1;
+  letter-spacing: -0.02em;
+  font-weight: 800;
+  min-width: 0;
+  text-align: left;
+}
+
+.planningPillarBar .planningPillarPickerName {
+  font-size: clamp(22px, 5vw, 32px);
+}
+
+.planningPillarPickerChevron {
+  flex-shrink: 0;
+  opacity: 0.55;
+  transition: transform 0.15s ease;
+}
+
+.planningPillarPickerChevronOpen {
+  transform: rotate(180deg);
+}
+
+.planningPillarPickerMenu {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  z-index: 20;
+  list-style: none;
+  margin: 0;
+  padding: 6px;
+  min-width: 220px;
+  max-width: min(360px, calc(100vw - 32px));
+  border: 1px solid rgba(0, 0, 0, 0.12);
+  border-radius: 12px;
+  background: #ffffff;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+}
+
+.planningPillarPickerOption {
+  display: block;
+  width: 100%;
+  border: none;
+  background: none;
+  padding: 8px 10px;
+  border-radius: 8px;
+  cursor: pointer;
+  text-align: left;
+  font: inherit;
+  font-size: 14px;
+  font-weight: 400;
+  color: inherit;
+}
+
+.planningPillarPickerOption:hover,
+.planningPillarPickerOptionSelected {
+  background: rgba(0, 0, 0, 0.05);
+}
+
+.planningMonthNav {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.planningMonthLabel {
+  font-size: 15px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  min-width: 128px;
+  text-align: center;
+}
+
+.planningLayout {
+  display: grid;
+  grid-template-columns: minmax(0, 1.55fr) minmax(280px, 1fr);
+  gap: 20px;
+  align-items: start;
+}
+
+.planningLayoutCalendar {
+  min-width: 0;
+}
+
+.planningLayoutSidebar {
+  display: grid;
+  gap: 16px;
+  min-width: 0;
+}
+
+.planningLayoutSidebar .planningMilestones,
+.planningLayoutSidebar .planningHabits,
+.planningLayoutSidebar .pillarCalendarNoteCard {
+  margin: 0;
+}
+
+.planningHabits {
+  border-left: 4px solid var(--pillar-color, #000000);
+  background: var(--pillar-color-soft, rgba(0, 0, 0, 0.03));
+}
+
+.planningHabitsHeader {
+  display: grid;
+  gap: 6px;
+  margin-bottom: 12px;
+}
+
+.planningHabitsTitle {
+  margin: 0;
+  font-size: 20px;
+  letter-spacing: -0.02em;
+}
+
+.planningHabitsHint {
+  margin: 0;
+}
+
+.planningHabitsToggle {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  white-space: nowrap;
+}
+
+.planningHabitList {
+  list-style: none;
+  margin: 0 0 12px;
+  padding: 0;
+  display: grid;
+  gap: 8px;
+}
+
+.planningHabitItem {
+  display: grid;
+  gap: 8px;
+  border: 1px solid rgba(0, 0, 0, 0.12);
+  border-radius: 10px;
+  padding: 10px 12px;
+  background: #fff;
+}
+
+.planningHabitItemInactive {
+  opacity: 0.65;
+}
+
+.planningHabitItemEditing {
+  background: rgba(255, 255, 255, 0.85);
+}
+
+.planningHabitItemMain {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+
+.planningHabitFormFields {
+  display: grid;
+  gap: 8px;
+}
+
+.planningHabitDayPicker {
+  display: grid;
+  gap: 6px;
+}
+
+.planningHabitDays {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.planningHabitDayToggle {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.planningHabitDayToggle input {
+  margin: 0;
+}
+
+.planningHabitCountRow {
+  display: grid;
+  gap: 4px;
+}
+
+.planningHabitCountInput {
+  max-width: 88px;
+}
+
+.planningHabitTaskHint {
+  margin: 0;
+}
+
+.planningHabitAddForm {
+  display: grid;
+  gap: 10px;
+}
+
+.planningHabitProgress {
+  display: grid;
+  gap: 6px;
+}
+
+.planningHabitWeekLabel {
+  margin: 0;
+  font-size: 13px;
+  font-style: italic;
+  opacity: 0.75;
+}
+
+.planningHabits .recurringDailyRow,
+.planningHabits .recurringCountRow {
+  flex-wrap: wrap;
+}
+
+@media (max-width: 960px) {
+  .planningLayout {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 640px) {
+  .planningPillarPickerName {
+    font-size: 32px;
+  }
+
+  .planningPillarPickerMenu {
+    left: 0;
+    right: 0;
+    min-width: 0;
+  }
+
+  .planningMonthNav {
+    width: 100%;
+    max-width: 280px;
+    justify-content: center;
+  }
+}
+
+.planningIdeas {
+  margin-top: 24px;
+  padding-top: 20px;
+  border-top: 1px solid rgba(0, 0, 0, 0.1);
+}
+
+.planningIdeasTitle {
+  margin: 0 0 4px;
+  font-size: 18px;
+  letter-spacing: -0.02em;
+}
+
+.planningIdeasHint {
+  margin: 0;
+}
+
+.planningIdeasEmpty {
+  margin: 0;
+}
+
+.planningIdeaAddForm {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+.planningIdeaAddInput {
+  flex: 1;
+  min-width: 160px;
+}
+
+.planningIdeasList {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.planningIdeaTile {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  box-sizing: border-box;
+  padding: 6px 8px 6px 10px;
+  border: 1px dashed rgba(0, 0, 0, 0.16);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.7);
+  max-width: 100%;
+}
+
+.planningIdeaTile.isDragging {
+  opacity: 0.92;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+  z-index: 2;
+  position: relative;
+}
+
+.planningIdeaCalendarDrag {
+  cursor: grab;
+}
+
+.planningIdeaCalendarDrag:active {
+  cursor: grabbing;
+}
+
+.planningIdeaDragHandle {
+  width: 32px;
+  height: 32px;
+  flex-shrink: 0;
+  margin-left: auto;
+}
+
+.planningIdeaTileEditing {
+  flex-wrap: wrap;
+  border-style: solid;
+}
+
+.planningIdeaTitle {
+  border: none;
+  background: none;
+  padding: 0;
+  margin: 0;
+  font: inherit;
+  font-size: 14px;
+  text-align: left;
+  cursor: pointer;
+  color: inherit;
+  flex: 1;
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.planningIdeaTitle:hover {
+  opacity: 0.75;
+}
+
+.planningIdeaNoteBadge {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: rgba(0, 0, 0, 0.55);
+  flex-shrink: 0;
+}
+
+.planningIdeaModalHeader {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 4px;
+}
+
+.planningIdeaModalForm {
+  margin-top: 8px;
+}
+
+.planningIdeaModalNoteInput {
+  resize: vertical;
+}
+
+.planningIdeaModalDateInput {
+  width: 100%;
+}
+
+.planningIdeaModalDateHint {
+  margin: 0;
+}
+
+.planningIdeaCompleteToggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.planningIdeaCompleteToggle input {
+  width: 16px;
+  height: 16px;
+  accent-color: #000000;
+}
+
+.planningIdeaEditInput {
+  flex: 1;
+  min-width: 140px;
+}
+
+.srOnly {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.pillarCalendar {
+  display: grid;
+  gap: 20px;
+}
+
+.pillarCalendarPillarPick {
+  display: grid;
+  gap: 8px;
+}
+
+.pillarCalendarPillarHint {
+  margin: 0;
+}
+
+.pillarCalendarPillarTabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.pillarCalendarPillarTab {
+  border: 1px solid rgba(0, 0, 0, 0.2);
+  border-radius: 999px;
+  padding: 2px 4px;
+  background: #ffffff;
+  cursor: pointer;
+}
+
+.pillarCalendarPillarTabActive {
+  border-color: var(--pillar-color, #000000);
+  box-shadow: 0 0 0 2px var(--pillar-color-soft, rgba(0, 0, 0, 0.08));
+}
+
+.pillarCalendarNoteCard {
+  border-left: 4px solid var(--pillar-color, #000000);
+  background: var(--pillar-color-soft, rgba(0, 0, 0, 0.03));
+}
+
+.pillarCalendarNoteHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.pillarCalendarNoteEditBtn {
+  font-size: 13px;
+  padding: 6px 12px;
+}
+
+.pillarCalendarNoteText {
+  margin: 0;
+  white-space: pre-wrap;
+  line-height: 1.5;
+  font-size: 15px;
+}
+
+.pillarCalendarNoteEmpty {
+  margin: 0;
+}
+
+.pillarCalendarNoteActions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.pillarCalendarNoteInput {
+  width: 100%;
+  box-sizing: border-box;
+  resize: vertical;
+  min-height: 72px;
+}
+
+.pillarNoteFieldsSection {
+  display: grid;
+  gap: 8px;
+  margin-bottom: 12px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.08);
+}
+
+.pillarNoteFieldsSectionHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.pillarNoteFieldsManageBtn {
+  font-size: 12px;
+}
+
+.pillarNoteFieldsList {
+  margin: 0;
+  display: grid;
+  gap: 8px;
+}
+
+.pillarNoteFieldRow {
+  display: grid;
+  gap: 4px;
+}
+
+.pillarNoteFieldLabel {
+  margin: 0;
+  font-size: 12px;
+  font-weight: 600;
+  opacity: 0.75;
+}
+
+.pillarNoteFieldValue {
+  margin: 0;
+}
+
+.pillarNoteFieldValueInput {
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.pillarNoteFieldsEmpty,
+.pillarNoteFieldsSavedHint {
+  margin: 0;
+}
+
+.pillarNoteFieldsModal {
+  max-width: 520px;
+}
+
+.pillarNoteFieldsDraftList {
+  display: grid;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
+.pillarNoteFieldDraft {
+  display: grid;
+  gap: 8px;
+  padding: 10px;
+  border: 1px solid rgba(0, 0, 0, 0.12);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.7);
+}
+
+.pillarNoteFieldDraftTop {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 120px auto;
+  gap: 8px;
+  align-items: center;
+}
+
+.pillarNoteFieldOptionsInput {
+  width: 100%;
+  box-sizing: border-box;
+  resize: vertical;
+}
+
+@media (max-width: 640px) {
+  .pillarNoteFieldDraftTop {
+    grid-template-columns: 1fr;
+  }
+}
+
+.pillarCalendarMonthHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.pillarCalendarMonthTitle {
+  margin: 0;
+  font-size: 22px;
+  letter-spacing: -0.02em;
+}
+
+.planningMilestones {
+  border-left: 4px solid var(--pillar-color, #000000);
+  background: var(--pillar-color-soft, rgba(0, 0, 0, 0.03));
+}
+
+.planningMilestonesHeader {
+  display: grid;
+  gap: 6px;
+  margin-bottom: 12px;
+}
+
+.planningCardHeaderTop {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.planningIconBtn,
+.actionIconBtn {
+  border: 1px solid rgba(0, 0, 0, 0.2);
+  border-radius: 6px;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: #ffffff;
+  cursor: pointer;
+  flex-shrink: 0;
+  font-size: 18px;
+  line-height: 1;
+  color: inherit;
+}
+
+.planningIconBtn:hover:not(:disabled),
+.actionIconBtn:hover:not(:disabled) {
+  background: rgba(0, 0, 0, 0.04);
+}
+
+.planningIconBtn:disabled,
+.actionIconBtn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.actionIconBtnDanger:hover:not(:disabled) {
+  color: #b42318;
+  border-color: rgba(180, 35, 24, 0.35);
+  background: rgba(180, 35, 24, 0.06);
+}
+
+.planningMilestonesTitle {
+  margin: 0;
+  font-size: 20px;
+  letter-spacing: -0.02em;
+}
+
+.planningMilestonesHint {
+  margin: 0;
+}
+
+.planningMilestonesToggle {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  white-space: nowrap;
+}
+
+.planningMilestoneCheck {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1;
+  min-width: 0;
+}
+
+.planningMilestoneRowActions {
+  display: flex;
+  gap: 4px;
+  margin-left: auto;
+  align-items: center;
+}
+
+.planningMilestoneRowBtn {
+  font-size: 12px;
+  padding: 4px 8px;
+}
+
+.planningMilestoneEditRow {
+  flex-direction: column;
+  align-items: stretch;
+}
+
+.planningMilestoneEditTitle {
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.planningMilestoneEditActions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.pillarCalendarMilestone {
+  width: 100%;
+  text-align: left;
+  border: none;
+  border-radius: 6px;
+  padding: 3px 5px;
+  font-size: 11px;
+  line-height: 1.25;
+  font-weight: 600;
+  background: rgba(0, 0, 0, 0.06);
+  border-left: 2px dashed var(--pillar-color, #000000);
+  cursor: pointer;
+  word-break: break-word;
+}
+
+.pillarCalendarMilestoneDone {
+  opacity: 0.55;
+  text-decoration: line-through;
+}
+
+.pillarCalendarNavBtn {
+  min-width: 44px;
+  padding: 8px 12px;
+}
+
+.pillarCalendarGrid {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  border: 1px solid #000000;
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+.pillarCalendarWeekday {
+  padding: 8px 6px;
+  text-align: center;
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  background: rgba(0, 0, 0, 0.04);
+  border-bottom: 1px solid rgba(0, 0, 0, 0.12);
+}
+
+.pillarCalendarDay {
+  min-height: 108px;
+  padding: 6px;
+  border-right: 1px solid rgba(0, 0, 0, 0.08);
+  border-bottom: 1px solid rgba(0, 0, 0, 0.08);
+  background: #ffffff;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.pillarCalendarDay:nth-child(7n) {
+  border-right: none;
+}
+
+.pillarCalendarDayOutside {
+  opacity: 0.45;
+  background: rgba(0, 0, 0, 0.02);
+}
+
+.pillarCalendarDayToday {
+  background: var(--pillar-color-soft, rgba(0, 0, 0, 0.04));
+  box-shadow: inset 0 0 0 2px var(--pillar-color, #000000);
+}
+
+.pillarCalendarDayDropTarget {
+  background: var(--pillar-color-soft, rgba(0, 0, 0, 0.06));
+  box-shadow: inset 0 0 0 2px var(--pillar-color, rgba(0, 0, 0, 0.35));
+}
+
+.pillarCalendarDayHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 4px;
+}
+
+.pillarCalendarDayNum {
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.pillarCalendarAddBtn {
+  border: 1px solid rgba(0, 0, 0, 0.25);
+  border-radius: 6px;
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  line-height: 1;
+  font-size: 16px;
+  background: #ffffff;
+  cursor: pointer;
+}
+
+.pillarCalendarAddBtn:hover {
+  background: rgba(0, 0, 0, 0.04);
+}
+
+.pillarCalendarTaskList {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 3px;
+  flex: 1;
+  align-content: start;
+}
+
+.pillarCalendarTask {
+  width: 100%;
+  text-align: left;
+  border: none;
+  border-radius: 6px;
+  padding: 3px 5px;
+  font-size: 11px;
+  line-height: 1.25;
+  background: var(--pillar-color-soft, rgba(0, 0, 0, 0.06));
+  border-left: 2px solid var(--pillar-color, #000000);
+  cursor: grab;
+  word-break: break-word;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+}
+
+.pillarCalendarTaskTitle {
+  min-width: 0;
+  flex: 1 1 auto;
+  word-break: break-word;
+}
+
+.pillarCalendarTaskNoteBadge {
+  font-size: 9px;
+  padding: 1px 6px;
+}
+
+.pillarCalendarTask:active {
+  cursor: grabbing;
+}
+
+.pillarCalendarTaskDragging {
+  opacity: 0.45;
+}
+
+.pillarCalendarTaskDone {
+  opacity: 0.55;
+  text-decoration: line-through;
+}
+
+.pillarCalendarAddForm {
+  display: grid;
+  gap: 4px;
+  margin-top: auto;
+}
+
+.pillarCalendarAddInput {
+  width: 100%;
+  box-sizing: border-box;
+  font-size: 12px;
+  padding: 4px 6px;
+}
+
+.pillarCalendarAddActions {
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+}
+
+.pillarCalendarAddActions .chatSendBtn,
+.pillarCalendarAddActions .outlineButton {
+  font-size: 11px;
+  padding: 4px 8px;
+}
+
+.pillarCalendarFooterHint {
+  margin: 0;
+}
+
+.textLink {
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+@media (max-width: 720px) {
+  .pillarCalendarDay {
+    min-height: 88px;
+    padding: 4px;
+  }
+
+  .pillarCalendarTask {
+    font-size: 10px;
+  }
+
+  .pillarCalendarWeekday {
+    font-size: 10px;
+    padding: 6px 2px;
+  }
+}
+
+/* Settings */
+.settingsSections {
+  display: grid;
+  gap: 20px;
+}
+
+.settingsTabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.12);
+  padding-bottom: 12px;
+}
+
+.settingsTab {
+  border: 1px solid rgba(0, 0, 0, 0.2);
+  border-radius: 999px;
+  padding: 8px 16px;
+  font-size: 14px;
+  font-weight: 600;
+  background: #fff;
+  cursor: pointer;
+}
+
+.settingsTab:hover {
+  background: rgba(0, 0, 0, 0.03);
+}
+
+.settingsTabActive {
+  border-color: #000;
+  background: rgba(0, 0, 0, 0.05);
+}
+
+.settingsPanel {
+  display: grid;
+  gap: 12px;
+}
+
+.settingsPanelTitle {
+  margin: 0;
+  font-size: 24px;
+  letter-spacing: -0.02em;
+}
+
+.settingsPanelHint {
+  margin: 0;
 }
 

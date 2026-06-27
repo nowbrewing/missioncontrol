@@ -71,7 +71,7 @@ export function createMcpServer() {
     {
       title: "Save Day Plan",
       description:
-        "Persist the confirmed daily plan: reflection text plus optional task id buckets (Today, This Week, Later). Call after user confirms.",
+        "Persist the confirmed daily plan: reflection text plus optional task id buckets (Today, Next 7 days, Later). Call after user confirms.",
       inputSchema: {
         user_id: z.number(),
         plan_date: z.string().describe("YYYY-MM-DD planning date"),

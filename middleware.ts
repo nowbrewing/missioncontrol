@@ -6,7 +6,13 @@ const PROTECTED_PREFIXES = [
   "/daily",
   "/tasks",
   "/mission",
+  "/thinkpad",
+  "/reflection",
+  "/correction",
   "/scheduling",
+  "/calendar",
+  "/planning",
+  "/settings",
 ];
 
 export function middleware(req: NextRequest) {
@@ -33,6 +39,12 @@ export const config = {
     "/daily/:path*",
     "/tasks/:path*",
     "/mission/:path*",
+    "/thinkpad/:path*",
+    "/reflection/:path*",
+    "/correction/:path*",
     "/scheduling/:path*",
+    "/calendar/:path*",
+    "/planning/:path*",
+    "/settings/:path*",
   ],
 };

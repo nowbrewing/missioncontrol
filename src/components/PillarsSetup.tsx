@@ -18,10 +18,12 @@ import {
   verticalListSortingStrategy,
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 import PillarColorDot from "./PillarColorDot";
 import PillarColorPicker from "./PillarColorPicker";
+import ActionIconButton, { DeleteIcon } from "./ActionIconButton";
 import PillarContextField from "./PillarContextField";
 import PillarTasksModal from "./PillarTasksModal";
 import { DEFAULT_PILLAR_COLOR, pillarColorVars } from "../lib/pillar-colors";
@@ -63,6 +65,7 @@ type Task = {
   deadline: string | null;
   completed_at: string | null;
   pillar_id: number | null;
+  milestone_id: number | null;
 };
 
 function DragHandle({
@@ -286,14 +289,14 @@ function SortableMilestoneRow({
       {milestone.target_date && (
         <span className="pill pillSubtle">{milestone.target_date}</span>
       )}
-      <button
-        type="button"
-        className="rankBtn milestoneDeleteBtn"
+      <ActionIconButton
+        label={`Delete milestone: ${milestone.title}`}
         onClick={() => onRequestDelete(milestone.id, milestone.title)}
-        aria-label={`Delete milestone: ${milestone.title}`}
+        variant="danger"
+        className="milestoneDeleteBtn"
       >
-        ×
-      </button>
+        <DeleteIcon />
+      </ActionIconButton>
     </li>
   );
 }
@@ -897,13 +900,18 @@ export default function PillarsSetup({ onboarding = false }: { onboarding?: bool
         <h2 className="sectionTitle" style={{ margin: 0 }}>
           Your pillars
         </h2>
-        <button
-          type="button"
-          className="chatSendBtn"
-          onClick={() => setShowAddPillar(true)}
-        >
-          Add pillar
-        </button>
+        <div className="pillarsPageHeaderActions">
+          <Link href="/tasks" className="outlineButton">
+            All tasks
+          </Link>
+          <button
+            type="button"
+            className="chatSendBtn"
+            onClick={() => setShowAddPillar(true)}
+          >
+            Add pillar
+          </button>
+        </div>
       </div>
 
       {pillars.length > 0 && (
@@ -998,8 +1006,10 @@ export default function PillarsSetup({ onboarding = false }: { onboarding?: bool
           pillar={tasksModalPillar}
           rank={tasksModalPillarRank}
           tasks={tasks}
+          milestones={milestones}
           onClose={() => setTasksModalPillarId(null)}
           onToggleTask={(id, completed) => void togglePillarTask(id, completed)}
+          onTaskAdded={load}
         />
       )}
 

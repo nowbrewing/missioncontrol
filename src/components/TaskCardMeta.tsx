@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, type ReactNode } from "react";
+import ActionIconButton, { EditIcon } from "./ActionIconButton";
 import PillarChip from "./PillarChip";
 import TaskMilestoneSelect from "./TaskMilestoneSelect";
 import TaskPillarSelect from "./TaskPillarSelect";
@@ -99,15 +100,12 @@ export default function TaskCardMeta({
             : milestone.title}
         </span>
       ) : null}
-      <button
-        type="button"
-        className="outlineButton btnCompact taskCardEditBtn"
+      <ActionIconButton
+        label="Edit pillar, milestone, and schedule"
         onClick={() => setEditing(true)}
-        aria-label="Edit pillar, milestone, and schedule"
-        title="Edit pillar, milestone, and schedule"
       >
-        Edit
-      </button>
+        <EditIcon />
+      </ActionIconButton>
     </div>
   );
 }

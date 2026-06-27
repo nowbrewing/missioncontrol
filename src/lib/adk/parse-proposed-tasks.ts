@@ -1,13 +1,12 @@
 import { z } from "zod";
 import { isYyyyMmDd } from "../date";
-
-const bucketSchema = z.enum(["Today", "This Week", "Later"]);
+import { agentBucketSchema, type AgentBucket } from "../mission-buckets";
 
 const proposedTaskSchema = z.object({
   title: z.string(),
   pillar: z.string().optional(),
   deadline: z.string().nullable().optional(),
-  bucket: bucketSchema.optional(),
+  bucket: agentBucketSchema.optional(),
 });
 
 const proposedTasksArraySchema = z.array(proposedTaskSchema);
@@ -17,7 +16,7 @@ export type ParsedProposedTask = {
   pillar: string;
   pillar_id: number | null;
   deadline: string | null;
-  bucket: "Today" | "This Week" | "Later";
+  bucket: AgentBucket;
 };
 
 function extractJsonArray(text: string): unknown {

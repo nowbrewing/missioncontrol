@@ -9,7 +9,7 @@ export default async function SignupPage() {
   const user = await getSessionUser();
   if (user) {
     if (!(await userHasPillars(user.id))) {
-      redirect("/pillars?onboarding=1");
+      redirect("/settings?onboarding=1");
     }
     redirect("/mission");
   }

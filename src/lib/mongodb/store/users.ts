@@ -26,6 +26,9 @@ export function pillarToRow(p: MongoPillar, userId: number) {
     user_id: userId,
     name: p.name,
     description: p.description,
+    calendar_note: p.calendarNote ?? null,
+    note_fields: p.noteFields ?? [],
+    note_field_values: p.noteFieldValues ?? {},
     abbreviation: p.abbreviation,
     color: p.color,
     rank: p.rank,
@@ -57,6 +60,7 @@ export async function createUser(email: string, name: string, passwordHash: stri
     name,
     passwordHash,
     preferences: null,
+    routineRules: null,
     pillars: [],
     createdAt: new Date(),
   };
@@ -112,6 +116,9 @@ export async function insertPillar(
     tursoId,
     name: data.name,
     description: data.description,
+    calendarNote: null,
+    noteFields: [],
+    noteFieldValues: {},
     abbreviation: data.abbreviation,
     color: data.color,
     rank: data.rank,
@@ -129,7 +136,19 @@ export async function insertPillar(
 export async function updatePillar(
   userId: number,
   pillarId: number,
-  patch: Partial<Pick<MongoPillar, "name" | "description" | "abbreviation" | "color" | "rank">>
+  patch: Partial<
+    Pick<
+      MongoPillar,
+      | "name"
+      | "description"
+      | "calendarNote"
+      | "noteFields"
+      | "noteFieldValues"
+      | "abbreviation"
+      | "color"
+      | "rank"
+    >
+  >
 ) {
   const db = await getMongoDb();
   const setFields: Record<string, unknown> = {};

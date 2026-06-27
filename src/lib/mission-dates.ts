@@ -1,4 +1,5 @@
 import { addDaysIsoYyyyMmDd, isYyyyMmDd, todayIsoYyyyMmDd } from "./date";
+import { isInNext7Days, next7DaysEnd } from "./mission-buckets";
 
 const WEEKDAYS = [
   "sunday",
@@ -61,7 +62,7 @@ export function formatRelativeDateLabel(
   if (!deadline) return "No date";
   if (deadline === today) return "Today";
   if (deadline === addDaysIsoYyyyMmDd(today, 1)) return "Tomorrow";
-  if (deadline > today && isInSameWeek(deadline, today)) return "This week";
+  if (isInNext7Days(deadline, today)) return "Next 7 days";
   return deadline;
 }
 
@@ -76,8 +77,8 @@ export function inferDeadlineFromText(text: string, today = todayIsoYyyyMmDd()):
     return addDaysIsoYyyyMmDd(today, 1);
   }
 
-  if (/\bthis week\b/.test(lower)) {
-    return fridayOfWeekContaining(today);
+  if (/\bthis week\b|\bnext 7 days\b/.test(lower)) {
+    return next7DaysEnd(today);
   }
 
   const isoMatch = text.match(/\b(20\d{2}-\d{2}-\d{2})\b/);

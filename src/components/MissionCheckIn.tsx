@@ -25,7 +25,7 @@ export default function MissionCheckIn({
       pillar: string;
       pillar_id: number | null;
       deadline: string | null;
-      bucket: "Today" | "This Week" | "Later";
+      bucket: "Today" | "Next 7 days" | "Later";
     }[];
   }) => void;
 }) {

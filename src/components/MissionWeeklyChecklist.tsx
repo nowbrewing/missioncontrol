@@ -1,6 +1,24 @@
 "use client";
 
-import { useState } from "react";
+import {
+  DndContext,
+  KeyboardSensor,
+  PointerSensor,
+  TouchSensor,
+  closestCenter,
+  type DragEndEvent,
+  useSensor,
+  useSensors,
+} from "@dnd-kit/core";
+import {
+  SortableContext,
+  arrayMove,
+  sortableKeyboardCoordinates,
+  useSortable,
+  verticalListSortingStrategy,
+} from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
+import { useEffect, useState } from "react";
 import PillarChip from "./PillarChip";
 import type { RecurringWeekItem } from "../lib/recurring-events";
 import {
@@ -8,6 +26,7 @@ import {
   countProgressDone,
   dailyCheckDone,
   dailyTallyTotal,
+  tallyBarFillPercent,
   type CountProgress,
   type DailyCheckProgress,
   type DailyTallyProgress,
@@ -116,8 +135,8 @@ function DailyTallyRow({
   const [activeDate, setActiveDate] = useState<string | null>(null);
   const total = dailyTallyTotal(progress);
   const hasTarget = item.target_count > 0;
-  const pct = hasTarget ? Math.min(100, (total / item.target_count) * 100) : 0;
-  const activeCount = activeDate ? progress.values[activeDate] ?? 0 : 0;
+  const pct = hasTarget ? tallyBarFillPercent(total, item.target_count) : 0;
+  const activeCount = activeDate ? (progress.values[activeDate] ?? 0) : 0;
 
   function setDayValue(date: string, raw: string) {
     const values = { ...progress.values };
@@ -247,10 +266,42 @@ function RecurringItemRow({
   today: string;
   onProgressChange: (progress: RecurringProgress) => void;
 }) {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    setActivatorNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id: item.event_id });
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+  };
+
   return (
-    <li className="card recurringChecklistItem">
-      <div className="recurringChecklistHead">
+    <li
+      ref={setNodeRef}
+      style={style}
+      className={`card recurringChecklistItem ${isDragging ? "isDragging" : ""}`}
+    >
+      <div className="recurringChecklistItemTop">
         <strong className="recurringChecklistTitle">{item.title}</strong>
+        <button
+          type="button"
+          ref={setActivatorNodeRef}
+          className="dragHandle recurringChecklistDragHandle"
+          aria-label={`Drag to reorder: ${item.title}`}
+          {...listeners}
+          {...attributes}
+        >
+          ⠿
+        </button>
+      </div>
+
+      <div className="recurringChecklistMeta">
         {item.pillar_name && (
           <PillarChip
             name={item.pillar_name}
@@ -282,13 +333,40 @@ export default function MissionWeeklyChecklist({
   today,
   loading,
   onProgressChange,
+  onReorder,
 }: {
   items: RecurringWeekItem[];
   weekMonday: string;
   today: string;
   loading: boolean;
   onProgressChange: (item: RecurringWeekItem, progress: RecurringProgress) => void;
+  onReorder?: (ids: number[]) => void | Promise<void>;
 }) {
+  const [orderedItems, setOrderedItems] = useState(items);
+
+  useEffect(() => {
+    setOrderedItems(items);
+  }, [items]);
+
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
+    useSensor(TouchSensor, { activationConstraint: { delay: 180, tolerance: 6 } }),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
+  );
+
+  async function handleDragEnd(event: DragEndEvent) {
+    const { active, over } = event;
+    if (!over || active.id === over.id) return;
+
+    const oldIndex = orderedItems.findIndex((item) => item.event_id === active.id);
+    const newIndex = orderedItems.findIndex((item) => item.event_id === over.id);
+    if (oldIndex < 0 || newIndex < 0) return;
+
+    const next = arrayMove(orderedItems, oldIndex, newIndex);
+    setOrderedItems(next);
+    await onReorder?.(next.map((item) => item.event_id));
+  }
+
   if (loading) {
     return (
       <section className="section missionWeeklyChecklist">
@@ -298,31 +376,38 @@ export default function MissionWeeklyChecklist({
     );
   }
 
+  const sortableIds = orderedItems.map((item) => item.event_id);
+
   return (
     <section className="section missionWeeklyChecklist">
       <h2 className="sectionTitle">Weekly checklist</h2>
       <p className="sectionHint">
         Week of {weekMonday} (Mon–Sun). Resets each Monday.
+        {orderedItems.length > 1 ? " Drag ⠿ to reorder." : ""}
       </p>
 
-      {items.length === 0 ? (
+      {orderedItems.length === 0 ? (
         <div className="card recurringChecklistEmpty">
           <p style={{ margin: 0, opacity: 0.8 }}>
-            No recurring items yet. Add habits and routines on the{" "}
-            <strong>Routines</strong> page in the nav bar.
+            No recurring items yet. Add habits on the{" "}
+            <strong>Planning</strong> page.
           </p>
         </div>
       ) : (
-        <ul className="recurringChecklistList">
-          {items.map((item) => (
-            <RecurringItemRow
-              key={item.progress_id}
-              item={item}
-              today={today}
-              onProgressChange={(progress) => onProgressChange(item, progress)}
-            />
-          ))}
-        </ul>
+        <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+          <SortableContext items={sortableIds} strategy={verticalListSortingStrategy}>
+            <ul className="recurringChecklistList">
+              {orderedItems.map((item) => (
+                <RecurringItemRow
+                  key={item.progress_id}
+                  item={item}
+                  today={today}
+                  onProgressChange={(progress) => onProgressChange(item, progress)}
+                />
+              ))}
+            </ul>
+          </SortableContext>
+        </DndContext>
       )}
     </section>
   );

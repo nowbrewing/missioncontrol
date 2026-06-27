@@ -6,9 +6,7 @@ import MissionBrief from "./MissionBrief";
 import MissionCheckIn from "./MissionCheckIn";
 import MissionLifeAdminStats from "./MissionLifeAdminStats";
 import type { LifeAdminStats } from "../lib/life-admin";
-import ProposedTasksReviewModal, {
-  type ProposedTaskDraft,
-} from "./ProposedTasksReviewModal";
+import { useOpenChat } from "./open-chat/OpenChatProvider";
 import type { MissionReflectionDisplay } from "../lib/mission-reflection-display";
 import MissionWeeklyChecklist from "./MissionWeeklyChecklist";
 import type { RecurringWeekItem } from "../lib/recurring-events";
@@ -16,16 +14,11 @@ import type { RecurringProgress } from "../lib/recurring-week";
 import type { BoardItem } from "../lib/mission-layout";
 import { todayIsoYyyyMmDd } from "../lib/date";
 import { patchTaskInBrief } from "../lib/patch-task-in-brief";
+import { sortTodayWithCompletedAtBottom } from "../lib/mission-layout";
 import { scheduleTypeFromMode } from "./TaskScheduleSelect";
 import type { TaskScheduleMode } from "./TaskScheduleSelect";
 import { resolvePillarAbbreviation } from "../lib/pillar-abbreviation";
 import type { ComingUpItem, MissionMilestone, MissionTask } from "../lib/mission-prioritize";
-
-type ChatMessage = {
-  id: string;
-  role: "user" | "assistant";
-  content: string;
-};
 
 type BriefData = {
   today: string;
@@ -43,39 +36,24 @@ type BriefData = {
   coming_up_next: ComingUpItem[];
   board_today: BoardItem[];
   board_coming_up: BoardItem[];
+  board_done_today?: BoardItem[];
   reflection: MissionReflectionDisplay | null;
   life_admin?: LifeAdminStats | null;
 };
 
 export default function MissionControl() {
+  const { registerBriefRefresh, syncChatBrief, openCheckInProposedReview } =
+    useOpenChat();
   const [planDate, setPlanDate] = useState(() => todayIsoYyyyMmDd());
   const [scrollToBoard, setScrollToBoard] = useState(false);
   const [thisWeekExpanded, setThisWeekExpanded] = useState(false);
   const [brief, setBrief] = useState<BriefData | null>(null);
   const [loadingBrief, setLoadingBrief] = useState(true);
-  const [chatInput, setChatInput] = useState("");
-  const [showChat, setShowChat] = useState(true);
-  const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
-  const [chatBusy, setChatBusy] = useState(false);
-  const [chatError, setChatError] = useState<string | null>(null);
-  const [summarizingSession, setSummarizingSession] = useState(false);
-  const [sessionSaveNotice, setSessionSaveNotice] = useState<string | null>(null);
   const [recurringItems, setRecurringItems] = useState<RecurringWeekItem[]>([]);
   const [recurringWeekMonday, setRecurringWeekMonday] = useState("");
   const [loadingRecurring, setLoadingRecurring] = useState(true);
-  const [proposedTasks, setProposedTasks] = useState<ProposedTaskDraft[]>([]);
-  const [proposedReviewOpen, setProposedReviewOpen] = useState(false);
-  const [savingProposed, setSavingProposed] = useState(false);
   const todayAnchorRef = useRef<HTMLDivElement | null>(null);
-  const chatMessagesRef = useRef(chatMessages);
-  const summarizedCountRef = useRef(0);
-  const chatBusyRef = useRef(chatBusy);
-  const planDateRef = useRef(planDate);
-  const finalizeInFlightRef = useRef(false);
-
-  chatMessagesRef.current = chatMessages;
-  chatBusyRef.current = chatBusy;
-  planDateRef.current = planDate;
+  const applyBriefRef = useRef<(raw: Record<string, unknown>) => void>(() => {});
 
   const loadRecurringWeek = useCallback(async () => {
     const res = await fetch("/api/recurring-events/week");
@@ -101,6 +79,7 @@ export default function MissionControl() {
         coming_up_next: data.coming_up_next,
         board_today: data.board_today ?? [],
         board_coming_up: data.board_coming_up ?? [],
+        board_done_today: data.board_done_today ?? [],
         reflection: data.reflection ?? null,
         life_admin: data.life_admin ?? null,
       });
@@ -129,16 +108,30 @@ export default function MissionControl() {
       coming_up_next: nextBrief.coming_up_next,
       board_today: nextBrief.board_today ?? [],
       board_coming_up: nextBrief.board_coming_up ?? [],
+      board_done_today: nextBrief.board_done_today ?? [],
       reflection: nextBrief.reflection ?? null,
       life_admin: nextBrief.life_admin ?? null,
     });
   }
 
-  function openProposedTaskReview(drafts: ProposedTaskDraft[]) {
-    if (drafts.length === 0) return;
-    setProposedTasks(drafts);
-    setProposedReviewOpen(true);
-  }
+  applyBriefRef.current = applyBrief;
+
+  useEffect(() => {
+    return registerBriefRefresh((raw) => {
+      applyBriefRef.current(raw);
+      setScrollToBoard(true);
+    });
+  }, [registerBriefRefresh]);
+
+  useEffect(() => {
+    if (!brief) return;
+    syncChatBrief({
+      today: brief.today,
+      pillars: brief.pillars,
+      milestones: brief.milestones,
+      tasks: brief.tasks,
+    });
+  }, [brief, syncChatBrief]);
 
   function handleCheckInProcessed(data: {
     brief: Record<string, unknown>;
@@ -147,7 +140,7 @@ export default function MissionControl() {
       pillar: string;
       pillar_id: number | null;
       deadline: string | null;
-      bucket: "Today" | "This Week" | "Later";
+      bucket: "Today" | "Next 7 days" | "Later";
     }[];
   }) {
     applyBrief(data.brief);
@@ -157,59 +150,16 @@ export default function MissionControl() {
       // Dev HMR can corrupt .next chunks; checklist refresh is non-critical here.
     });
 
-    const taskDrafts: ProposedTaskDraft[] = (data.proposed_tasks ?? []).map(
-      (task, i) => ({
-        localId: `proposed-${i}-${task.title}`,
-        title: task.title,
-        pillar: task.pillar,
-        pillar_id: task.pillar_id,
-        deadline: task.deadline,
-        bucket: task.bucket,
-      })
-    );
+    const taskDrafts = (data.proposed_tasks ?? []).map((task, i) => ({
+      localId: `proposed-${i}-${task.title}`,
+      title: task.title,
+      pillar: task.pillar,
+      pillar_id: task.pillar_id,
+      deadline: task.deadline,
+      bucket: task.bucket,
+    }));
 
-    openProposedTaskReview(taskDrafts);
-  }
-
-  async function confirmProposedTasks(tasks: ProposedTaskDraft[]) {
-    if (tasks.length === 0) {
-      setProposedReviewOpen(false);
-      setProposedTasks([]);
-      return;
-    }
-
-    setSavingProposed(true);
-    try {
-      const res = await fetch("/api/mission/proposed-tasks", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          plan_date: planDate,
-          tasks: tasks.map((t) => ({
-            title: t.title.trim(),
-            pillar_id: t.pillar_id,
-            deadline: t.deadline,
-            bucket: t.bucket,
-          })),
-        }),
-      });
-      const data = await res.json();
-      if (!res.ok || !data.ok) {
-        throw new Error(data.error || "Failed to save tasks");
-      }
-      if (data.brief) applyBrief(data.brief);
-      setProposedReviewOpen(false);
-      setProposedTasks([]);
-      setScrollToBoard(true);
-    } finally {
-      setSavingProposed(false);
-    }
-  }
-
-  function dismissProposedReview() {
-    if (savingProposed) return;
-    setProposedReviewOpen(false);
-    setProposedTasks([]);
+    openCheckInProposedReview(taskDrafts);
   }
 
   useEffect(() => {
@@ -219,12 +169,43 @@ export default function MissionControl() {
   }, [brief, scrollToBoard]);
 
   async function toggleTask(id: number, completed: boolean) {
-    await fetch(`/api/tasks/${id}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ completed }),
+    const completed_at = completed ? new Date().toISOString() : null;
+    setBrief((prev) => {
+      if (!prev) return prev;
+      if (!completed) {
+        const doneItem = (prev.board_done_today ?? []).find(
+          (i) => i.kind === "task" && i.id === id
+        );
+        if (doneItem) {
+          const restored = { ...doneItem, completed_at: null };
+          const patched = patchTaskInBrief(prev, id, { completed_at });
+          return {
+            ...patched,
+            board_done_today: (patched.board_done_today ?? []).filter(
+              (i) => i.key !== doneItem.key
+            ),
+            board_today: sortTodayWithCompletedAtBottom([
+              ...patched.board_today,
+              restored,
+            ]),
+          };
+        }
+      }
+      const patched = patchTaskInBrief(prev, id, { completed_at });
+      return {
+        ...patched,
+        board_today: sortTodayWithCompletedAtBottom(patched.board_today),
+      };
     });
-    await loadBrief(planDate);
+    try {
+      await fetch(`/api/tasks/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ completed }),
+      });
+    } catch {
+      await loadBrief(planDate);
+    }
   }
 
   async function updateTaskDeadline(id: number, deadline: string | null) {
@@ -345,6 +326,16 @@ export default function MissionControl() {
     }
   }
 
+  async function updateTaskNote(id: number, note: string | null) {
+    setBrief((prev) => (prev ? patchTaskInBrief(prev, id, { note }) : prev));
+    try {
+      await patchTask(id, { note });
+    } catch {
+      await loadBrief(planDate);
+      throw new Error("Could not save task note");
+    }
+  }
+
   async function deleteTask(id: number) {
     await fetch(`/api/tasks/${id}`, { method: "DELETE" });
     await loadBrief(planDate);
@@ -373,117 +364,25 @@ export default function MissionControl() {
     await loadBrief(planDate);
   }
 
-  async function finalizeChatSession(clearAfter = false) {
-    if (finalizeInFlightRef.current || chatBusyRef.current) return;
-
-    const all = chatMessagesRef.current;
-    const slice = all.slice(summarizedCountRef.current);
-    const hasUser = slice.some((m) => m.role === "user");
-    const hasExchange =
-      slice.some((m) => m.role === "assistant") && hasUser;
-    if (!hasExchange) return;
-
-    finalizeInFlightRef.current = true;
-    setSummarizingSession(true);
-
+  async function reorderRecurringItems(ids: number[]) {
+    setRecurringItems((prev) => {
+      const byId = new Map(prev.map((item) => [item.event_id, item]));
+      return ids
+        .map((id) => byId.get(id))
+        .filter((item): item is RecurringWeekItem => item != null);
+    });
     try {
-      const res = await fetch("/api/mission/chat/summarize", {
+      const res = await fetch("/api/recurring-events/reorder", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          plan_date: planDateRef.current,
-          messages: slice.map((m) => ({ role: m.role, content: m.content })),
-        }),
-      });
-      const data = await res.json();
-      if (!res.ok || !data.ok) return;
-
-      summarizedCountRef.current = all.length;
-      setSessionSaveNotice("Chat saved to daily log");
-      window.setTimeout(() => setSessionSaveNotice(null), 4500);
-
-      if (clearAfter) {
-        setChatMessages([]);
-        summarizedCountRef.current = 0;
-      }
-    } catch {
-      // non-blocking
-    } finally {
-      finalizeInFlightRef.current = false;
-      setSummarizingSession(false);
-    }
-  }
-
-  const finalizeChatSessionRef = useRef(finalizeChatSession);
-  finalizeChatSessionRef.current = finalizeChatSession;
-
-  useEffect(() => {
-    const onPageHide = () => {
-      void finalizeChatSessionRef.current(false);
-    };
-    const onVisibility = () => {
-      if (document.visibilityState === "hidden") {
-        void finalizeChatSessionRef.current(false);
-      }
-    };
-    window.addEventListener("pagehide", onPageHide);
-    document.addEventListener("visibilitychange", onVisibility);
-    return () => {
-      window.removeEventListener("pagehide", onPageHide);
-      document.removeEventListener("visibilitychange", onVisibility);
-    };
-  }, []);
-
-  function toggleChatPanel() {
-    if (showChat) {
-      void finalizeChatSession(true);
-    }
-    setShowChat((v) => !v);
-  }
-
-  async function onChatSubmit(e: React.FormEvent) {
-    e.preventDefault();
-    const text = chatInput.trim();
-    if (!text || chatBusy) return;
-
-    const userMessage: ChatMessage = {
-      id: `user-${Date.now()}`,
-      role: "user",
-      content: text,
-    };
-    setChatMessages((prev) => [...prev, userMessage]);
-    setChatInput("");
-
-    setChatBusy(true);
-    setChatError(null);
-
-    try {
-      const res = await fetch("/api/mission/chat", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          message: text,
-          plan_date: planDate,
-          history: chatMessages.map((m) => ({ role: m.role, content: m.content })),
-        }),
+        body: JSON.stringify({ ids }),
       });
       const data = await res.json();
       if (!res.ok || !data.ok) {
-        throw new Error(data.error || "Chat failed");
+        throw new Error(data.error || "Could not reorder");
       }
-
-      setChatMessages((prev) => [
-        ...prev,
-        {
-          id: `assistant-${Date.now()}`,
-          role: "assistant",
-          content: String(data.reply),
-        },
-      ]);
-    } catch (err) {
-      setChatError(err instanceof Error ? err.message : "Chat failed");
-    } finally {
-      setChatBusy(false);
+    } catch {
+      await loadRecurringWeek();
     }
   }
 
@@ -502,119 +401,6 @@ export default function MissionControl() {
         onProcessed={handleCheckInProcessed}
       />
 
-      <section className="missionChatHero">
-        <header className="missionChatHeroHeader">
-          <button
-            type="button"
-            className="missionChatHeroTitleBtn"
-            onClick={toggleChatPanel}
-            aria-expanded={showChat}
-            disabled={summarizingSession}
-          >
-            <h2 className="missionChatHeroTitle">Chat with assistant</h2>
-          </button>
-          <div className="missionChatHeroHeaderActions">
-            {summarizingSession && (
-              <span className="missionChatSessionStatus">Saving to daily log…</span>
-            )}
-            {!summarizingSession && sessionSaveNotice && (
-              <span className="missionChatSessionStatus missionChatSessionSaved">
-                {sessionSaveNotice}
-              </span>
-            )}
-            <button
-              type="button"
-              className="missionChatHeroToggleBtn"
-              onClick={toggleChatPanel}
-              aria-expanded={showChat}
-              aria-label={showChat ? "Collapse chat" : "Expand chat"}
-              disabled={summarizingSession}
-            >
-              <span
-                className={`collapseChevron missionChatHeroChevron ${showChat ? "collapseChevronOpen" : ""}`}
-                aria-hidden
-              >
-                ▸
-              </span>
-            </button>
-          </div>
-        </header>
-
-        {showChat && (
-          <div className="missionChatHeroBody">
-            <p
-              className="missionChatHeroSubtext"
-              title="Open conversation — think out loud, reflect, or go deep on a pillar. When you collapse the chat, a summary is saved to your daily log with pillar tags for future context."
-            >
-              Think out loud or go deep on a pillar — collapse the chat when you&apos;re
-              done and a summary lands in your daily log.
-            </p>
-
-            <div className="chatMessages missionChatMessages" aria-live="polite">
-              {chatMessages.length === 0 && (
-                <p className="missionChatEmptyHint">
-                  e.g. &quot;I&apos;ve been spinning on the hackathon pitch — help me
-                  untangle what actually matters&quot;
-                </p>
-              )}
-              {chatMessages.map((message) => {
-                const isUser = message.role === "user";
-                return (
-                  <div
-                    key={message.id}
-                    className={`chatBubble ${isUser ? "chatBubbleUser" : "chatBubbleAssistant"}`}
-                  >
-                    <p className="chatTextPart">{message.content}</p>
-                  </div>
-                );
-              })}
-              {chatBusy && (
-                <div className="chatBubble chatBubbleAssistant">
-                  <p className="chatTextPart chatTextMuted">Thinking…</p>
-                </div>
-              )}
-            </div>
-
-            {chatError && (
-              <div className="chatErrorBox">
-                <strong>Assistant error</strong>
-                <p className="chatError">{chatError}</p>
-              </div>
-            )}
-
-            <form className="chatForm missionChatForm" onSubmit={onChatSubmit}>
-              <textarea
-                className="chatInput missionChatInput"
-                rows={3}
-                value={chatInput}
-                onChange={(e) => setChatInput(e.target.value)}
-                placeholder="What's on your mind?"
-                disabled={chatBusy || summarizingSession}
-              />
-              <button
-                className="chatSendBtn"
-                type="submit"
-                disabled={chatBusy || summarizingSession || !chatInput.trim()}
-              >
-                {chatBusy ? "..." : "Send"}
-              </button>
-            </form>
-          </div>
-        )}
-      </section>
-
-      {proposedReviewOpen && brief && (
-        <ProposedTasksReviewModal
-          key={proposedTasks.map((t) => t.localId).join("|")}
-          tasks={proposedTasks}
-          pillars={brief.pillars}
-          planDate={planDate}
-          saving={savingProposed}
-          onConfirm={confirmProposedTasks}
-          onDismiss={dismissProposedReview}
-        />
-      )}
-
       {brief && (
         <div className="missionBoardAndChecklist">
           <div className="missionBoardMain">
@@ -625,6 +411,7 @@ export default function MissionControl() {
               calendarToday={brief.calendar_today ?? todayIsoYyyyMmDd()}
               boardToday={brief.board_today}
               boardComingUp={brief.board_coming_up}
+              boardDoneToday={brief.board_done_today ?? []}
               pillars={brief.pillars}
               milestones={brief.milestones}
               reflection={brief.reflection}
@@ -641,6 +428,7 @@ export default function MissionControl() {
               onMilestoneChange={updateTaskMilestone}
               onScheduleChange={updateTaskSchedule}
               onTitleChange={updateTaskTitle}
+              onNoteChange={updateTaskNote}
               onDeleteTask={deleteTask}
               onDateLockChange={toggleTaskDateLock}
               onLayoutChange={(today, comingUp) =>
@@ -661,7 +449,7 @@ export default function MissionControl() {
                       className="outlineButton btnCompact"
                       onClick={() => setThisWeekExpanded(false)}
                     >
-                      Hide this week
+                      Hide next 7 days
                     </button>
                   </div>
                   <MissionBrief
@@ -678,6 +466,7 @@ export default function MissionControl() {
                     onMilestoneChange={updateTaskMilestone}
                     onScheduleChange={updateTaskSchedule}
                     onTitleChange={updateTaskTitle}
+                    onNoteChange={updateTaskNote}
                     onDeleteTask={deleteTask}
                     onDateLockChange={toggleTaskDateLock}
                     onLayoutChange={(today, comingUp) =>
@@ -712,6 +501,7 @@ export default function MissionControl() {
               today={brief.today}
               loading={loadingRecurring}
               onProgressChange={updateRecurringProgress}
+              onReorder={reorderRecurringItems}
             />
             <MissionLifeAdminStats stats={brief.life_admin ?? null} />
           </aside>

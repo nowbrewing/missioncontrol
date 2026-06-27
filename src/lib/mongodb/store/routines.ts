@@ -29,8 +29,10 @@ function routineToRow(r: MongoRoutine) {
     pillar_id: r.pillarId,
     milestone_id: r.milestoneId,
     spawn_task_cards: r.spawnTaskCards ? 1 : 0,
+    end_date: r.endDate ?? null,
     active: r.active ? 1 : 0,
     rank: r.rank,
+    rules: r.rules ?? null,
     created_at: toSqlDatetime(r.createdAt),
   };
 }
@@ -77,7 +79,9 @@ export async function insertRoutine(
     pillarId: number | null;
     milestoneId: number | null;
     spawnTaskCards: boolean;
+    endDate?: string | null;
     rank: number;
+    rules?: string | null;
   }
 ) {
   const user = await findUserById(userId);
@@ -97,8 +101,10 @@ export async function insertRoutine(
     pillarId: data.pillarId,
     milestoneId: data.milestoneId,
     spawnTaskCards: data.spawnTaskCards,
+    endDate: data.endDate ?? null,
     active: true,
     rank: data.rank,
+    rules: data.rules?.trim() || null,
     createdAt: new Date(),
   };
   await db.collection<MongoRoutine>(COLLECTIONS.routines).insertOne(doc);
@@ -117,8 +123,10 @@ export async function updateRoutine(
     pillarId: number | null;
     milestoneId: number | null;
     spawnTaskCards: boolean;
+    endDate: string | null;
     active: boolean;
     rank: number;
+    rules: string | null;
   }>
 ) {
   const db = await getMongoDb();
@@ -129,6 +137,16 @@ export async function updateRoutine(
   );
   if (!result) throw new Error("Routine not found");
   return routineToRow(result);
+}
+
+export async function reorderRoutines(userId: number, ids: number[]) {
+  const db = await getMongoDb();
+  for (let i = 0; i < ids.length; i++) {
+    await db.collection<MongoRoutine>(COLLECTIONS.routines).updateOne(
+      { tursoUserId: userId, tursoId: ids[i] },
+      { $set: { rank: i } }
+    );
+  }
 }
 
 export async function deleteRoutine(userId: number, routineId: number) {
@@ -247,8 +265,10 @@ export function parseRoutineRow(raw: Record<string, unknown>): MongoRoutine & { 
     pillarId: raw.pillar_id != null ? Number(raw.pillar_id) : null,
     milestoneId: raw.milestone_id != null ? Number(raw.milestone_id) : null,
     spawnTaskCards: Number(raw.spawn_task_cards) === 1,
+    endDate: raw.end_date != null ? String(raw.end_date).slice(0, 10) : null,
     active: Number(raw.active) === 1,
     rank: Number(raw.rank),
+    rules: raw.rules != null ? String(raw.rules) : null,
     createdAt: new Date(String(raw.created_at)),
     id: Number(raw.id),
   };

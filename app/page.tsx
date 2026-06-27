@@ -10,7 +10,7 @@ export default async function HomePage() {
 
   if (user) {
     if (!(await userHasPillars(user.id))) {
-      redirect("/pillars?onboarding=1");
+      redirect("/settings?onboarding=1");
     }
     redirect("/mission");
   }

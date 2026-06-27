@@ -1,14 +1,19 @@
 import { z } from "zod";
 import { isYyyyMmDd } from "../date";
+import {
+  agentBucketSchema,
+  canAgentPostponeDeadline,
+  enforceOrchestrationBucketRules,
+  inferDefaultOrchestrationBucket,
+  type AgentBucket,
+} from "../mission-buckets";
 import { shouldSurfaceOverdueOnToday } from "../task-schedule";
-
-const bucketSchema = z.enum(["Today", "This Week", "Later"]);
 
 const proposedTaskSchema = z.object({
   title: z.string(),
   pillar: z.string().optional(),
   deadline: z.string().nullable().optional(),
-  bucket: bucketSchema.optional(),
+  bucket: agentBucketSchema.optional(),
 });
 
 const rescheduleSchema = z.object({
@@ -52,7 +57,7 @@ export type ParsedProposedTaskFromOrchestration = {
   pillar: string;
   pillar_id: number | null;
   deadline: string | null;
-  bucket: "Today" | "This Week" | "Later";
+  bucket: AgentBucket;
 };
 
 export type ParsedOrchestrationResult = {
@@ -108,21 +113,26 @@ export function completeLayoutForOpenTasks(
 
   const taskById = new Map(openTasks.map((t) => [Number(t.id), t]));
   const overdueMissing: number[] = [];
-  const otherMissing: number[] = [];
+  const weekMissing: number[] = [];
+  const laterMissing: number[] = [];
 
   for (const id of missing) {
     const task = taskById.get(id);
-    if (planDate && task && shouldSurfaceOverdueOnToday(task, planDate)) {
-      overdueMissing.push(id);
-    } else {
-      otherMissing.push(id);
+    if (!task || !planDate) {
+      weekMissing.push(id);
+      continue;
     }
+    const bucket = inferDefaultOrchestrationBucket(task, planDate);
+    if (bucket === "today") overdueMissing.push(id);
+    else if (bucket === "later") laterMissing.push(id);
+    else weekMissing.push(id);
   }
 
   return {
     ...layout,
     today: [...layout.today, ...overdueMissing],
-    this_week: [...layout.this_week, ...otherMissing],
+    this_week: [...layout.this_week, ...weekMissing],
+    later: [...layout.later, ...laterMissing],
   };
 }
 
@@ -161,6 +171,10 @@ export function parseSynthesisResult(
   for (const row of parsed.reschedule ?? []) {
     const deadline =
       row.deadline && isYyyyMmDd(row.deadline) ? row.deadline : null;
+    const task = openTasks.find((t) => Number(t.id) === row.task_id);
+    if (task && deadline && !canAgentPostponeDeadline(task, deadline, planDate ?? "")) {
+      continue;
+    }
     reschedules.push({
       task_id: row.task_id,
       deadline,
@@ -168,7 +182,7 @@ export function parseSynthesisResult(
     });
   }
 
-  const layout = completeLayoutForOpenTasks(
+  let layout = completeLayoutForOpenTasks(
     {
       today: parsed.today ?? [],
       this_week: parsed.this_week ?? [],
@@ -178,6 +192,10 @@ export function parseSynthesisResult(
     openTasks,
     planDate
   );
+
+  if (planDate) {
+    layout = enforceOrchestrationBucketRules(layout, openTasks, planDate);
+  }
 
   const laterIds = new Set(layout.later);
   const overdueInWeek = layout.this_week.filter((id) => {

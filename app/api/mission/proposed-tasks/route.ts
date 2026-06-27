@@ -10,7 +10,7 @@ import {
 export const runtime = "nodejs";
 export const maxDuration = 30;
 
-type TaskBucket = "Today" | "This Week" | "Later";
+type TaskBucket = "Today" | "Next 7 days" | "Later";
 
 export async function POST(req: Request) {
   try {
@@ -23,6 +23,7 @@ export async function POST(req: Request) {
         pillar_id?: number | null;
         deadline?: string | null;
         bucket?: TaskBucket;
+        note?: string | null;
       }[];
     };
 
@@ -51,6 +52,7 @@ export async function POST(req: Request) {
 
       const row = await insertTask(user.id, {
         title,
+        note: task.note?.trim() || null,
         deadline,
         rank: nextRank++,
         pillarId: task.pillar_id ?? null,

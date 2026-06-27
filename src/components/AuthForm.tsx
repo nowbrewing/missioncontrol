@@ -16,7 +16,7 @@ export default function AuthForm({
   const searchParams = useSearchParams();
   const next =
     searchParams.get("next") ||
-    (mode === "signup" ? "/pillars?onboarding=1" : "/mission");
+    (mode === "signup" ? "/settings?onboarding=1" : "/mission");
 
   const [email, setEmail] = useState("");
   const [name, setName] = useState("");

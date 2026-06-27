@@ -1,4 +1,5 @@
 import type { ObjectId } from "mongodb";
+import type { PillarNoteFieldDef, PillarNoteFieldValues } from "../pillar-note-fields";
 import type { RecurringKind, RecurringProgress } from "../recurring-week";
 import type { MissionLayout } from "../mission-layout";
 
@@ -6,6 +7,11 @@ export type MongoPillar = {
   tursoId: number;
   name: string;
   description: string | null;
+  /** Quick scheduling reminders shown on the pillar calendar (e.g. "Mondays: deep work"). */
+  calendarNote: string | null;
+  /** Pillar-specific structured fields shown under the planning note (e.g. Theme, Style). */
+  noteFields: PillarNoteFieldDef[];
+  noteFieldValues: PillarNoteFieldValues;
   color: string;
   abbreviation: string | null;
   rank: number;
@@ -19,6 +25,7 @@ export type MongoUser = {
   name: string;
   passwordHash: string;
   preferences: string | null;
+  routineRules: string | null;
   pillars: MongoPillar[];
   createdAt: Date;
 };
@@ -74,6 +81,7 @@ export type MongoTask = {
   milestoneId: number | null;
   title: string;
   description: string | null;
+  note: string | null;
   deadline: Date | null;
   bucket: TaskBucket | null;
   status: TaskStatus;
@@ -84,6 +92,8 @@ export type MongoTask = {
   recurringWeekMonday: string | null;
   recurringSlot: string | null;
   isNew: boolean;
+  /** Undated capture — excluded from calendar and mission prioritization until scheduled. */
+  isIdea: boolean;
   dateLocked: boolean;
   completedAt: Date | null;
   createdAt: Date;
@@ -102,8 +112,11 @@ export type MongoRoutine = {
   dailyDays: boolean[];
   tallyEnabled: boolean;
   spawnTaskCards: boolean;
+  /** Last calendar day for spawned tasks — null means ongoing (4-week rolling horizon). */
+  endDate: string | null;
   active: boolean;
   rank: number;
+  rules: string | null;
   createdAt: Date;
 };
 
@@ -131,7 +144,12 @@ export type MongoDailyLog = {
   updatedAt: Date;
 };
 
-export type DailyLogKind = "went_well" | "went_poorly" | "daily_focus" | "assistant_chat";
+export type DailyLogKind =
+  | "went_well"
+  | "went_poorly"
+  | "daily_focus"
+  | "assistant_chat"
+  | "weekly_summary";
 
 export type MongoDailyLogEntry = {
   _id?: ObjectId;
@@ -142,6 +160,8 @@ export type MongoDailyLogEntry = {
   content: string;
   /** Empty or omitted = general / cross-pillar win */
   pillarIds?: number[];
+  /** Monday (YYYY-MM-DD) of the week this summary covers — weekly_summary only */
+  weekMonday?: string;
   createdAt: Date;
 };
 

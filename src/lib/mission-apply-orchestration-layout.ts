@@ -1,6 +1,11 @@
 import { getMissionLayout, upsertMissionLayout } from "./mongodb/store/daily-logs";
 import { updateTask } from "./mongodb/store/tasks";
 import type { MissionLayout, MissionLayoutRef } from "./mission-layout";
+import {
+  canAgentPostponeDeadline,
+  inferDefaultOrchestrationBucket,
+  isInNext7Days,
+} from "./mission-buckets";
 import { shouldSurfaceOverdueOnToday } from "./task-schedule";
 import type {
   OrchestrationLayout,
@@ -63,7 +68,8 @@ function promoteOverdueFromComingUp(
 export async function applyOrchestrationReschedules(
   userId: number,
   reschedules: OrchestrationReschedule[],
-  openTasks: TaskRow[]
+  openTasks: TaskRow[],
+  planDate: string
 ) {
   const taskById = new Map(openTasks.map((t) => [Number(t.id), t]));
 
@@ -71,6 +77,7 @@ export async function applyOrchestrationReschedules(
     const task = taskById.get(item.task_id);
     if (!task || isDateLockedTask(task)) continue;
     if (!item.deadline) continue;
+    if (!canAgentPostponeDeadline(task, item.deadline, planDate)) continue;
     await updateTask(userId, item.task_id, { deadline: item.deadline });
     task.deadline = item.deadline;
   }
@@ -83,7 +90,7 @@ export async function applyOrchestrationLayout(
   openTasks: TaskRow[],
   reschedules: OrchestrationReschedule[] = []
 ) {
-  await applyOrchestrationReschedules(userId, reschedules, openTasks);
+  await applyOrchestrationReschedules(userId, reschedules, openTasks, planDate);
 
   const taskById = new Map(openTasks.map((t) => [Number(t.id), t]));
   const rescheduleBucket = new Map(
@@ -102,7 +109,7 @@ export async function applyOrchestrationLayout(
     if (isDateLockedTask(task)) {
       if (task.deadline === planDate) {
         today.push(taskRef(id, true));
-      } else if (task.deadline && task.deadline > planDate) {
+      } else if (task.deadline && isInNext7Days(task.deadline, planDate)) {
         coming_up.push(taskRef(id));
       } else {
         laterRefs.push(taskRef(id));
@@ -149,7 +156,14 @@ export async function applyOrchestrationLayout(
 
   for (const task of openTasks) {
     if (used.has(task.id)) continue;
-    coming_up.push(taskRef(task.id));
+    const bucket = inferDefaultOrchestrationBucket(task, planDate);
+    if (bucket === "today") {
+      today.push(taskRef(task.id, true));
+    } else if (bucket === "later") {
+      laterRefs.push(taskRef(task.id));
+    } else {
+      coming_up.push(taskRef(task.id));
+    }
     used.add(task.id);
   }
 

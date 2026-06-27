@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import ActionIconButton, { DeleteIcon } from "./ActionIconButton";
 import PillarChip from "./PillarChip";
 
 export type WentWellDraft = {
@@ -93,15 +94,15 @@ export default function WentWellReviewModal({
                 <li key={statement.localId} className="card proposedTaskCard wentWellCard">
                   <div className="proposedTaskCardHead">
                     <span className="pill pillSubtle">Win</span>
-                    <button
-                      type="button"
-                      className="rankBtn proposedTaskRemoveBtn"
+                    <ActionIconButton
+                      label="Remove win statement"
                       onClick={() => removeStatement(statement.localId)}
                       disabled={saving}
-                      aria-label={`Remove win statement`}
+                      variant="danger"
+                      className="proposedTaskRemoveBtn"
                     >
-                      ×
-                    </button>
+                      <DeleteIcon />
+                    </ActionIconButton>
                   </div>
 
                   <div className="modalField">

@@ -5,6 +5,7 @@ import {
   parsePillarContext,
   removePillarContextAt,
   serializePillarContext,
+  updatePillarContextAt,
   type PillarContextEntry,
 } from "./pillar-context";
 
@@ -27,4 +28,12 @@ export function removeUserPreferenceAt(
   index: number
 ): string | null {
   return removePillarContextAt(preferences, index);
+}
+
+export function updateUserPreferencesAt(
+  preferences: string | null | undefined,
+  index: number,
+  text: string
+): string | null {
+  return updatePillarContextAt(preferences, index, text);
 }

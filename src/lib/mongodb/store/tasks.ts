@@ -11,6 +11,7 @@ function taskToRow(t: MongoTask) {
     user_id: t.tursoUserId,
     title: t.title,
     description: t.description,
+    note: t.note ?? null,
     deadline: toDateOnly(t.deadline),
     completed_at: toIso(t.completedAt),
     rank: t.rank,
@@ -22,6 +23,7 @@ function taskToRow(t: MongoTask) {
     recurring_week_monday: t.recurringWeekMonday,
     recurring_slot: t.recurringSlot,
     is_new: t.isNew ? 1 : 0,
+    is_idea: t.isIdea ? 1 : 0,
     date_locked: t.dateLocked ? 1 : 0,
     created_at: toSqlDatetime(t.createdAt),
   };
@@ -65,11 +67,49 @@ export async function getMaxTaskRank(userId: number): Promise<number> {
   return top[0]?.rank ?? -1;
 }
 
+export async function getMaxIdeaRankForPillar(
+  userId: number,
+  pillarId: number | null
+): Promise<number> {
+  const db = await getMongoDb();
+  const top = await db
+    .collection<MongoTask>(COLLECTIONS.tasks)
+    .find({ tursoUserId: userId, isIdea: true, pillarId })
+    .sort({ rank: -1 })
+    .limit(1)
+    .toArray();
+  return top[0]?.rank ?? -1;
+}
+
+export async function reorderIdeas(userId: number, pillarId: number, ids: number[]) {
+  const db = await getMongoDb();
+  const found = await db
+    .collection<MongoTask>(COLLECTIONS.tasks)
+    .find({
+      tursoUserId: userId,
+      tursoId: { $in: ids },
+      isIdea: true,
+      pillarId,
+    })
+    .toArray();
+  if (found.length !== ids.length) {
+    throw new Error("Invalid idea ids");
+  }
+
+  for (let i = 0; i < ids.length; i++) {
+    await db.collection<MongoTask>(COLLECTIONS.tasks).updateOne(
+      { tursoUserId: userId, tursoId: ids[i] },
+      { $set: { rank: i } }
+    );
+  }
+}
+
 export async function insertTask(
   userId: number,
   data: {
     title: string;
     description?: string | null;
+    note?: string | null;
     deadline?: string | null;
     rank: number;
     pillarId?: number | null;
@@ -80,6 +120,7 @@ export async function insertTask(
     recurringWeekMonday?: string | null;
     recurringSlot?: string | null;
     isNew?: boolean;
+    isIdea?: boolean;
     dateLocked?: boolean;
   }
 ) {
@@ -94,7 +135,8 @@ export async function insertTask(
     tursoUserId: userId,
     title: data.title,
     description: data.description ?? null,
-    deadline: data.deadline ? new Date(`${data.deadline}T12:00:00Z`) : null,
+    note: data.note ?? null,
+    deadline: data.isIdea ? null : data.deadline ? new Date(`${data.deadline}T12:00:00Z`) : null,
     rank: data.rank,
     pillarId: data.pillarId ?? null,
     milestoneId: data.milestoneId ?? null,
@@ -106,6 +148,7 @@ export async function insertTask(
     bucket: null,
     status: "pending",
     isNew: data.isNew ?? false,
+    isIdea: data.isIdea ?? false,
     dateLocked:
       data.dateLocked !== undefined
         ? data.dateLocked
@@ -123,6 +166,7 @@ export async function updateTask(
   patch: Partial<{
     title: string;
     description: string | null;
+    note: string | null;
     deadline: string | null;
     completedAt: string | null;
     rank: number;
@@ -132,12 +176,14 @@ export async function updateTask(
     windowStart: string | null;
     dateLocked: boolean;
     bucket: MongoTask["bucket"];
+    isIdea: boolean;
   }>
 ) {
   const db = await getMongoDb();
   const set: Partial<MongoTask> = {};
   if (patch.title !== undefined) set.title = patch.title;
   if (patch.description !== undefined) set.description = patch.description;
+  if (patch.note !== undefined) set.note = patch.note;
   if (patch.rank !== undefined) set.rank = patch.rank;
   if (patch.pillarId !== undefined) set.pillarId = patch.pillarId;
   if (patch.milestoneId !== undefined) set.milestoneId = patch.milestoneId;
@@ -147,7 +193,9 @@ export async function updateTask(
   if (patch.bucket !== undefined) set.bucket = patch.bucket;
   if (patch.deadline !== undefined) {
     set.deadline = patch.deadline ? new Date(`${patch.deadline}T12:00:00Z`) : null;
+    set.isIdea = !patch.deadline;
   }
+  if (patch.isIdea !== undefined) set.isIdea = patch.isIdea;
   if (patch.completedAt !== undefined) {
     set.completedAt = patch.completedAt ? new Date(patch.completedAt) : null;
     set.status = (patch.completedAt ? "completed" : "pending") as TaskStatus;
@@ -181,6 +229,37 @@ export async function listTasksByRecurring(
     .find({ tursoUserId: userId, recurringEventId: eventId, recurringWeekMonday: weekMonday })
     .toArray();
   return tasks.map(taskToRow);
+}
+
+export async function pruneOpenRecurringTasksAfterDate(
+  userId: number,
+  eventId: number,
+  afterDate: string
+) {
+  const db = await getMongoDb();
+  await db.collection<MongoTask>(COLLECTIONS.tasks).deleteMany({
+    tursoUserId: userId,
+    recurringEventId: eventId,
+    completedAt: null,
+    deadline: { $gt: new Date(`${afterDate}T12:00:00Z`) },
+  });
+}
+
+/** Remove all calendar tasks spawned for a habit, optionally from a date onward. */
+export async function deleteRecurringTasksForEvent(
+  userId: number,
+  eventId: number,
+  fromDate?: string
+) {
+  const db = await getMongoDb();
+  const filter: Record<string, unknown> = {
+    tursoUserId: userId,
+    recurringEventId: eventId,
+  };
+  if (fromDate) {
+    filter.deadline = { $gte: new Date(`${fromDate}T12:00:00Z`) };
+  }
+  await db.collection<MongoTask>(COLLECTIONS.tasks).deleteMany(filter);
 }
 
 export async function normalizeRecurringTaskSchedules(userId: number) {
