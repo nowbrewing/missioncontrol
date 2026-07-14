@@ -98,7 +98,7 @@ export function parseProgress(
         const values: Record<string, number> = {};
         for (const [date, n] of Object.entries(parsed.values)) {
           const num = Number(n);
-          if (Number.isFinite(num) && num !== 0) values[date] = num;
+          if (Number.isFinite(num)) values[date] = num;
         }
         return { values };
       }
@@ -108,7 +108,7 @@ export function parseProgress(
         for (const [date, v] of Object.entries(parsed.days)) {
           if (typeof v === "number") {
             const num = Number(v);
-            if (Number.isFinite(num) && num !== 0) values[date] = num;
+            if (Number.isFinite(num)) values[date] = num;
           }
         }
         return { values };
@@ -155,6 +155,14 @@ export function dailyTallyTotal(progress: DailyTallyProgress): number {
     (sum, n) => sum + (Number.isFinite(Number(n)) ? Number(n) : 0),
     0
   );
+}
+
+/** True when a day has an intentional log, including 0. */
+export function hasDailyTallyValue(
+  progress: DailyTallyProgress,
+  date: string
+): boolean {
+  return Object.prototype.hasOwnProperty.call(progress.values, date);
 }
 
 /** Progress bar fill — clamped at 0 when the running total is negative. */

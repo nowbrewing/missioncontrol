@@ -19,6 +19,11 @@ import { getMissionLayout } from "./mongodb/store/daily-logs";
 import { listMilestones } from "./mongodb/store/milestones";
 import { listTasks } from "./mongodb/store/tasks";
 import { listPillars } from "./mongodb/store/users";
+import { parseTaskNoteImages } from "./task-note-images";
+import {
+  parsePillarNoteFieldDefs,
+  parsePillarNoteFieldValues,
+} from "./pillar-note-fields";
 
 export async function buildMissionBrief(userId: number, focusDate?: string) {
   await ensureLifeAdminSetup(userId);
@@ -36,13 +41,17 @@ export async function buildMissionBrief(userId: number, focusDate?: string) {
   const pillarById = new Map(pillars.map((p) => [Number(p.id), p]));
   const pillarRankById = new Map(pillars.map((p) => [Number(p.id), Number(p.rank)]));
   const milestoneById = new Map(milestones.map((m) => [Number(m.id), m]));
+  const noteFieldsByPillarId = new Map(
+    pillars.map((p) => [Number(p.id), parsePillarNoteFieldDefs(p.note_fields)])
+  );
 
   const enrichedTasks: MissionTask[] = tasks
     .filter((t) => !isIdeaTask(t))
     .map((t) => {
     const milestone = t.milestone_id ? milestoneById.get(Number(t.milestone_id)) : null;
+    const pillarId = t.pillar_id != null ? Number(t.pillar_id) : null;
     const pillarDisplay = enrichTaskPillarDisplay(
-      t.pillar_id != null ? Number(t.pillar_id) : null,
+      pillarId,
       pillars.map((p) => ({
         id: Number(p.id),
         name: String(p.name),
@@ -51,11 +60,15 @@ export async function buildMissionBrief(userId: number, focusDate?: string) {
       })),
       resolvePillarAbbreviation
     );
+    const noteFields =
+      pillarId != null ? (noteFieldsByPillarId.get(pillarId) ?? []) : [];
     return {
       id: Number(t.id),
       title: String(t.title),
       description: t.description ? String(t.description) : null,
       note: t.note ? String(t.note) : null,
+      note_images: parseTaskNoteImages(t.note_images),
+      note_field_values: parsePillarNoteFieldValues(t.note_field_values, noteFields),
       deadline: t.deadline ? String(t.deadline) : null,
       schedule_type: t.schedule_type ? String(t.schedule_type) : "flexible",
       window_start: t.window_start ? String(t.window_start) : null,

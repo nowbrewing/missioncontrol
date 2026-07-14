@@ -383,6 +383,72 @@ a.outlineButton {
   margin-top: 4px;
 }
 
+.taskNoteModal {
+  max-width: 520px;
+}
+
+.taskNoteModalInput {
+  width: 100%;
+  box-sizing: border-box;
+  resize: vertical;
+  min-height: 12rem;
+}
+
+.taskNoteImagesSection {
+  margin-top: 12px;
+  display: grid;
+  gap: 8px;
+}
+
+.taskNoteImagesHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.taskNoteImagesEmpty {
+  margin: 0;
+}
+
+.taskNoteImagesList {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(96px, 1fr));
+  gap: 8px;
+}
+
+.taskNoteImageThumb {
+  position: relative;
+  aspect-ratio: 1;
+  border-radius: 8px;
+  overflow: hidden;
+  border: 1px solid rgba(0, 0, 0, 0.12);
+  background: rgba(0, 0, 0, 0.04);
+}
+
+.taskNoteImageThumb img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.taskNoteImageRemove {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  background: rgba(255, 255, 255, 0.92);
+}
+
+.taskNoteSavedNotice {
+  margin: 8px 0 0;
+  font-size: 13px;
+  font-weight: 600;
+}
+
 .modalError {
   color: #8a1f1f;
   font-size: 13px;
@@ -1282,6 +1348,40 @@ a.outlineButton {
   flex-shrink: 0;
 }
 
+.boardSoftBtn {
+  border: none;
+  outline: none;
+  box-shadow: none;
+  border-radius: 8px;
+  padding: 4px 8px;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.2;
+  white-space: nowrap;
+  background: rgba(0, 0, 0, 0.06);
+  color: rgba(0, 0, 0, 0.82);
+  cursor: pointer;
+  font-family: inherit;
+}
+
+.boardSoftBtn:hover:not(:disabled) {
+  background: rgba(0, 0, 0, 0.1);
+}
+
+.boardSoftBtn:focus-visible {
+  outline: 2px solid rgba(0, 0, 0, 0.28);
+  outline-offset: 1px;
+}
+
+.boardSoftBtn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.boardSoftBtnActive {
+  background: rgba(0, 0, 0, 0.1);
+}
+
 .taskCardMeta {
   display: flex;
   flex-wrap: wrap;
@@ -1315,11 +1415,6 @@ a.outlineButton {
 
 .taskScheduleTypePill {
   font-size: 12px;
-}
-
-.boardDemoteBtn {
-  font-size: 12px;
-  padding: 4px 8px;
 }
 
 .taskRowDone {
@@ -1632,10 +1727,11 @@ a.outlineButton {
 
 .missionChecklistAside {
   position: sticky;
-  top: 18px;
-  max-height: calc(100vh - 140px);
-  overflow-x: hidden;
-  overflow-y: auto;
+  top: 64px;
+  align-self: start;
+  max-height: calc(100dvh - 80px);
+  min-height: 0;
+  overflow: hidden;
   min-width: 0;
   background: #ffffff;
   isolation: isolate;
@@ -1647,6 +1743,7 @@ a.outlineButton {
 
 .missionChecklistAside .lifeAdminStats {
   margin-top: 0;
+  flex-shrink: 0;
 }
 
 .missionSectionHeader {
@@ -1764,6 +1861,15 @@ a.outlineButton {
     position: static;
     max-height: none;
     overflow: visible;
+  }
+
+  .missionWeeklyChecklist {
+    overflow: visible;
+  }
+
+  .missionWeeklyChecklistBody {
+    max-height: min(60dvh, 520px);
+    overflow-y: auto;
   }
 }
 
@@ -2714,6 +2820,10 @@ a.outlineButton {
   border-left: 3px solid var(--pillar-color, #000000);
 }
 
+.taskRowColored .taskCardMeta .pillarChip {
+  display: none;
+}
+
 .taskPillarGroup {
   border-left: 4px solid var(--pillar-color, #000000);
 }
@@ -2752,6 +2862,33 @@ a.outlineButton {
 .missionWeeklyChecklist {
   margin-top: 0;
   min-width: 0;
+  min-height: 0;
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.missionWeeklyChecklistHeader {
+  flex-shrink: 0;
+}
+
+.missionWeeklyChecklistHeader .sectionTitle {
+  margin: 0 0 4px;
+}
+
+.missionWeeklyChecklistHeader .sectionHint {
+  margin: 0;
+}
+
+.missionWeeklyChecklistBody {
+  flex: 1 1 auto;
+  min-height: 0;
+  margin-top: 10px;
+  overflow-x: hidden;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
 }
 
 .missionWeeklyChecklist .sectionHint {
@@ -4004,6 +4141,7 @@ a.outlineButton {
 
 .planningIdeaModalNoteInput {
   resize: vertical;
+  min-height: 12rem;
 }
 
 .planningIdeaModalDateInput {
@@ -4165,6 +4303,12 @@ a.outlineButton {
 .pillarNoteFieldValueInput {
   width: 100%;
   box-sizing: border-box;
+}
+
+.pillarNoteFieldLongTextInput {
+  min-height: 6rem;
+  resize: vertical;
+  line-height: 1.45;
 }
 
 .pillarNoteFieldsEmpty,
@@ -4521,6 +4665,83 @@ a.outlineButton {
 }
 
 @media (max-width: 720px) {
+  .boardItem {
+    gap: 6px 8px;
+  }
+
+  .boardDragHandle {
+    width: 28px;
+    height: 28px;
+    font-size: 16px;
+  }
+
+  .boardItem .taskCardRowTop {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 6px;
+  }
+
+  .boardItem .taskCardRowTop .taskDeadlineGroup {
+    align-self: flex-start;
+    max-width: 100%;
+  }
+
+  .boardItem .taskCardRowBottom {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 8px;
+  }
+
+  .taskRow .taskCardRowTop {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
+    grid-template-rows: auto auto;
+    gap: 6px 8px;
+    align-items: start;
+  }
+
+  .taskRow .taskCheck {
+    grid-row: 1 / span 2;
+    align-self: start;
+    padding-top: 2px;
+  }
+
+  .taskRow .taskCardRowTop .taskTitleBtn,
+  .taskRow .taskCardRowTop .taskTitleInput {
+    grid-column: 2;
+    grid-row: 1;
+    width: 100%;
+  }
+
+  .taskRow .taskCardRowTop .taskDeadlineInput {
+    grid-column: 2;
+    grid-row: 2;
+    justify-self: start;
+  }
+
+  .boardItemBody .taskDeadlineInput,
+  .boardItem .taskCardRowTop .taskDeadlineInput,
+  .taskRow .taskCardRowTop .taskDeadlineInput {
+    min-width: 0;
+    max-width: min(100%, 168px);
+  }
+
+  .taskCardRowBottom {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 8px;
+  }
+
+  .taskCardMeta {
+    width: 100%;
+  }
+
+  .taskCardActions {
+    width: 100%;
+    flex-wrap: wrap;
+    justify-content: flex-start;
+  }
+
   .pillarCalendarDay {
     min-height: 88px;
     padding: 4px;

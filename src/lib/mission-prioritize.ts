@@ -1,12 +1,16 @@
 import { addDaysIsoYyyyMmDd } from "./date";
 import { taskBelongsInTodayPriorities } from "./task-schedule";
 import { normalizeScheduleType, schedulePriorityBoost } from "./task-schedule";
+import type { TaskNoteImage } from "./task-note-images";
+import type { PillarNoteFieldValues } from "./pillar-note-fields";
 
 export type MissionTask = {
   id: number;
   title: string;
   description?: string | null;
   note?: string | null;
+  note_images?: TaskNoteImage[];
+  note_field_values?: PillarNoteFieldValues;
   deadline: string | null;
   schedule_type?: string | null;
   window_start?: string | null;

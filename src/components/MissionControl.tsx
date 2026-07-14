@@ -19,6 +19,7 @@ import { scheduleTypeFromMode } from "./TaskScheduleSelect";
 import type { TaskScheduleMode } from "./TaskScheduleSelect";
 import { resolvePillarAbbreviation } from "../lib/pillar-abbreviation";
 import type { ComingUpItem, MissionMilestone, MissionTask } from "../lib/mission-prioritize";
+import type { PillarNoteFieldDef } from "../lib/pillar-note-fields";
 
 type BriefData = {
   today: string;
@@ -29,6 +30,7 @@ type BriefData = {
     abbreviation?: string | null;
     color: string;
     rank: number;
+    note_fields?: PillarNoteFieldDef[];
   }[];
   milestones: MissionMilestone[];
   tasks: MissionTask[];
@@ -326,10 +328,29 @@ export default function MissionControl() {
     }
   }
 
-  async function updateTaskNote(id: number, note: string | null) {
-    setBrief((prev) => (prev ? patchTaskInBrief(prev, id, { note }) : prev));
+  async function updateTaskNote(
+    id: number,
+    change: {
+      note: string | null;
+      note_images: { id: string; src: string }[];
+      note_field_values: Record<string, string>;
+    }
+  ) {
+    setBrief((prev) =>
+      prev
+        ? patchTaskInBrief(prev, id, {
+            note: change.note,
+            note_images: change.note_images,
+            note_field_values: change.note_field_values,
+          })
+        : prev
+    );
     try {
-      await patchTask(id, { note });
+      await patchTask(id, {
+        note: change.note,
+        note_images: change.note_images,
+        note_field_values: change.note_field_values,
+      });
     } catch {
       await loadBrief(planDate);
       throw new Error("Could not save task note");

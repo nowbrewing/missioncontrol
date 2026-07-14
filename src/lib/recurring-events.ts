@@ -16,6 +16,7 @@ import {
   serializeDailyDays,
   weekDatesFromMonday,
   weekMondayFor,
+  hasDailyTallyValue,
   type CountProgress,
   type DailyCheckProgress,
   type DailyTallyProgress,
@@ -110,6 +111,10 @@ function tallyTaskDescription(total: number, targetCount: number): string {
   return `Week total: ${total}`;
 }
 
+function isTallyWeekSlot(slot: string): boolean {
+  return slot === "tally";
+}
+
 async function spawnWeeklyTasks(
   userId: number,
   event: RecurringEventRow,
@@ -123,6 +128,12 @@ async function spawnWeeklyTasks(
   const end = weekEnd(weekMonday);
   const tally = !!event.tally_enabled;
 
+  const existing = await listTasksByRecurring(userId, event.id, weekMonday);
+  if (existing.length > 0) {
+    await markRoutineTasksSpawned(userId, progressId);
+    return;
+  }
+
   let nextRank = (await getMaxTaskRank(userId)) + 1;
   let spawned = false;
 
@@ -133,18 +144,21 @@ async function spawnWeeklyTasks(
   }
 
   if (event.kind === "daily" && tally) {
-    if (includeDate(end)) {
+    for (let i = 0; i < 7; i++) {
+      if (!dailyDays[i]) continue;
+      if (!includeDate(weekDates[i])) continue;
       await insertTask(userId, {
         title: event.title,
-        description: tallyTaskDescription(0, event.target_count),
-        deadline: end,
+        description:
+          event.target_count > 0 ? tallyTaskDescription(0, event.target_count) : null,
+        deadline: weekDates[i],
         rank: nextRank++,
         pillarId: event.pillar_id,
         milestoneId: event.milestone_id,
-        scheduleType: "window",
+        scheduleType: "fixed",
         recurringEventId: event.id,
         recurringWeekMonday: weekMonday,
-        recurringSlot: "tally",
+        recurringSlot: weekDates[i],
       });
       spawned = true;
     }
@@ -220,7 +234,7 @@ async function ensureRoutineCalendarTasks(
   if (!event.spawnTaskCards) return;
 
   const horizonEnd = habitCalendarHorizonEnd(today, event.endDate ?? null);
-  const spawnFrom = fromDate && fromDate > today ? fromDate : today;
+  const spawnFrom = fromDate ?? today;
   if (horizonEnd < spawnFrom) return;
 
   const row = routineToEventRow(event);
@@ -390,11 +404,25 @@ export async function updateRecurringProgress(
 
   if (kind === "daily" && tallyEnabled && "values" in progress) {
     const total = dailyTallyTotal(progress);
-    const done = targetCount > 0 ? total >= targetCount : false;
+    const weekDone = targetCount > 0 ? total >= targetCount : false;
     for (const row of taskRows) {
+      const slot = String(row.recurring_slot);
+      if (isTallyWeekSlot(slot)) {
+        await updateTask(userId, Number(row.id), {
+          description: tallyTaskDescription(total, targetCount),
+          completedAt: weekDone ? new Date().toISOString() : null,
+        });
+        continue;
+      }
+      const dayValue = progress.values[slot];
+      const hasValue = hasDailyTallyValue(progress, slot);
       await updateTask(userId, Number(row.id), {
-        description: tallyTaskDescription(total, targetCount),
-        completedAt: done ? new Date().toISOString() : null,
+        description: hasValue
+          ? String(dayValue)
+          : targetCount > 0
+            ? tallyTaskDescription(total, targetCount)
+            : null,
+        completedAt: hasValue ? new Date().toISOString() : null,
       });
     }
   } else if (kind === "daily" && "days" in progress) {

@@ -2,16 +2,20 @@
 
 import { useEffect, useState } from "react";
 import ActionIconButton, { DeleteIcon } from "../ActionIconButton";
+import TaskPillarNoteFields from "./TaskPillarNoteFields";
+import type { PillarNoteFieldDef, PillarNoteFieldValues } from "../../lib/pillar-note-fields";
 import type { PlanningIdeaTask } from "./PlanningIdeas";
 
 type Props = {
   idea: PlanningIdeaTask;
+  noteFields: PillarNoteFieldDef[];
   open: boolean;
   busy: boolean;
   onClose: () => void;
   onSave: (patch: {
     title: string;
     note: string | null;
+    note_field_values: PillarNoteFieldValues;
     deadline: string | null;
     completed?: boolean;
   }) => Promise<void>;
@@ -24,6 +28,7 @@ function isScheduledTask(idea: PlanningIdeaTask) {
 
 export default function PlanningIdeaModal({
   idea,
+  noteFields,
   open,
   busy,
   onClose,
@@ -32,6 +37,9 @@ export default function PlanningIdeaModal({
 }: Props) {
   const [title, setTitle] = useState(idea.title);
   const [note, setNote] = useState(idea.note ?? "");
+  const [noteFieldValues, setNoteFieldValues] = useState<PillarNoteFieldValues>(
+    idea.note_field_values ?? {}
+  );
   const [deadline, setDeadline] = useState(idea.deadline ?? "");
   const [completed, setCompleted] = useState(!!idea.completed_at);
   const [saveError, setSaveError] = useState<string | null>(null);
@@ -40,6 +48,7 @@ export default function PlanningIdeaModal({
     if (!open) return;
     setTitle(idea.title);
     setNote(idea.note ?? "");
+    setNoteFieldValues(idea.note_field_values ?? {});
     setDeadline(idea.deadline ?? "");
     setCompleted(!!idea.completed_at);
     setSaveError(null);
@@ -58,6 +67,7 @@ export default function PlanningIdeaModal({
       await onSave({
         title: trimmedTitle,
         note: note.trim() || null,
+        note_field_values: noteFieldValues,
         deadline: deadline.trim() || null,
         ...(scheduled ? { completed } : {}),
       });
@@ -115,10 +125,17 @@ export default function PlanningIdeaModal({
               value={note}
               onChange={(e) => setNote(e.target.value)}
               placeholder="Leave a note for yourself…"
-              rows={5}
+              rows={10}
               disabled={busy}
             />
           </div>
+
+          <TaskPillarNoteFields
+            fields={noteFields}
+            values={noteFieldValues}
+            disabled={busy}
+            onChange={setNoteFieldValues}
+          />
 
           <div className="modalField">
             <label className="modalLabel" htmlFor="planning-idea-date">

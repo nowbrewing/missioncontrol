@@ -2,6 +2,7 @@ import type { ObjectId } from "mongodb";
 import type { PillarNoteFieldDef, PillarNoteFieldValues } from "../pillar-note-fields";
 import type { RecurringKind, RecurringProgress } from "../recurring-week";
 import type { MissionLayout } from "../mission-layout";
+import type { TaskNoteImage } from "../task-note-images";
 
 export type MongoPillar = {
   tursoId: number;
@@ -82,6 +83,10 @@ export type MongoTask = {
   title: string;
   description: string | null;
   note: string | null;
+  /** Images attached to the freeform task note. */
+  noteImages?: TaskNoteImage[];
+  /** Per-task values for the parent pillar's note field definitions. */
+  noteFieldValues?: PillarNoteFieldValues;
   deadline: Date | null;
   bucket: TaskBucket | null;
   status: TaskStatus;

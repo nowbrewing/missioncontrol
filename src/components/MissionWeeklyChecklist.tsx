@@ -27,6 +27,7 @@ import {
   dailyCheckDone,
   dailyTallyTotal,
   tallyBarFillPercent,
+  hasDailyTallyValue,
   type CountProgress,
   type DailyCheckProgress,
   type DailyTallyProgress,
@@ -61,6 +62,7 @@ function TallyDayCircle({
   date,
   dayLabel,
   count,
+  hasValue,
   isToday,
   isActive,
   onClick,
@@ -68,11 +70,11 @@ function TallyDayCircle({
   date: string;
   dayLabel: string;
   count: number;
+  hasValue: boolean;
   isToday: boolean;
   isActive: boolean;
   onClick: () => void;
 }) {
-  const hasValue = count !== 0;
   const display = hasValue ? String(count) : dayLabel;
 
   return (
@@ -136,7 +138,9 @@ function DailyTallyRow({
   const total = dailyTallyTotal(progress);
   const hasTarget = item.target_count > 0;
   const pct = hasTarget ? tallyBarFillPercent(total, item.target_count) : 0;
-  const activeCount = activeDate ? (progress.values[activeDate] ?? 0) : 0;
+  const activeLogged =
+    activeDate != null && hasDailyTallyValue(progress, activeDate);
+  const activeCount = activeLogged && activeDate ? progress.values[activeDate] : null;
 
   function setDayValue(date: string, raw: string) {
     const values = { ...progress.values };
@@ -147,11 +151,7 @@ function DailyTallyRow({
     }
     const n = Number(raw);
     if (!Number.isFinite(n)) return;
-    if (n === 0) {
-      delete values[date];
-    } else {
-      values[date] = n;
-    }
+    values[date] = n;
     onProgressChange({ values });
   }
 
@@ -160,12 +160,14 @@ function DailyTallyRow({
       <div className="recurringDailyRow">
         {item.week_dates.map((date, i) => {
           if (!item.daily_days[i]) return null;
+          const hasValue = hasDailyTallyValue(progress, date);
           return (
             <TallyDayCircle
               key={date}
               date={date}
               dayLabel={WEEKDAY_LABELS[i]}
-              count={progress.values[date] ?? 0}
+              count={hasValue ? progress.values[date] : 0}
+              hasValue={hasValue}
               isToday={date === today}
               isActive={activeDate === date}
               onClick={() => setActiveDate(activeDate === date ? null : date)}
@@ -185,8 +187,8 @@ function DailyTallyRow({
               type="number"
               className="invInput recurringCounterNumberInput"
               step={1}
-              value={activeCount === 0 ? "" : activeCount}
-              placeholder="0"
+              value={activeCount == null ? "" : activeCount}
+              placeholder="e.g. 0"
               onChange={(e) => setDayValue(activeDate, e.target.value)}
               autoFocus
             />
@@ -370,8 +372,10 @@ export default function MissionWeeklyChecklist({
   if (loading) {
     return (
       <section className="section missionWeeklyChecklist">
-        <h2 className="sectionTitle">Weekly checklist</h2>
-        <p className="sectionHint">Loading...</p>
+        <div className="missionWeeklyChecklistHeader">
+          <h2 className="sectionTitle">Weekly checklist</h2>
+          <p className="sectionHint">Loading...</p>
+        </div>
       </section>
     );
   }
@@ -380,35 +384,39 @@ export default function MissionWeeklyChecklist({
 
   return (
     <section className="section missionWeeklyChecklist">
-      <h2 className="sectionTitle">Weekly checklist</h2>
-      <p className="sectionHint">
-        Week of {weekMonday} (Mon–Sun). Resets each Monday.
-        {orderedItems.length > 1 ? " Drag ⠿ to reorder." : ""}
-      </p>
+      <div className="missionWeeklyChecklistHeader">
+        <h2 className="sectionTitle">Weekly checklist</h2>
+        <p className="sectionHint">
+          Week of {weekMonday} (Mon–Sun). Resets each Monday.
+          {orderedItems.length > 1 ? " Drag ⠿ to reorder." : ""}
+        </p>
+      </div>
 
-      {orderedItems.length === 0 ? (
-        <div className="card recurringChecklistEmpty">
-          <p style={{ margin: 0, opacity: 0.8 }}>
-            No recurring items yet. Add habits on the{" "}
-            <strong>Planning</strong> page.
-          </p>
-        </div>
-      ) : (
-        <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
-          <SortableContext items={sortableIds} strategy={verticalListSortingStrategy}>
-            <ul className="recurringChecklistList">
-              {orderedItems.map((item) => (
-                <RecurringItemRow
-                  key={item.progress_id}
-                  item={item}
-                  today={today}
-                  onProgressChange={(progress) => onProgressChange(item, progress)}
-                />
-              ))}
-            </ul>
-          </SortableContext>
-        </DndContext>
-      )}
+      <div className="missionWeeklyChecklistBody">
+        {orderedItems.length === 0 ? (
+          <div className="card recurringChecklistEmpty">
+            <p style={{ margin: 0, opacity: 0.8 }}>
+              No recurring items yet. Add habits on the{" "}
+              <strong>Planning</strong> page.
+            </p>
+          </div>
+        ) : (
+          <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+            <SortableContext items={sortableIds} strategy={verticalListSortingStrategy}>
+              <ul className="recurringChecklistList">
+                {orderedItems.map((item) => (
+                  <RecurringItemRow
+                    key={item.progress_id}
+                    item={item}
+                    today={today}
+                    onProgressChange={(progress) => onProgressChange(item, progress)}
+                  />
+                ))}
+              </ul>
+            </SortableContext>
+          </DndContext>
+        )}
+      </div>
     </section>
   );
 }

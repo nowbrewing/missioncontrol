@@ -24,11 +24,13 @@ import { isIdeaTask } from "../../lib/task-ideas";
 import { taskBelongsToPillarGroup } from "../../lib/life-admin";
 import { PLANNING_IDEA_DRAG_MIME } from "../../lib/planning-idea-dnd";
 import PlanningIdeaModal from "./PlanningIdeaModal";
+import type { PillarNoteFieldDef, PillarNoteFieldValues } from "../../lib/pillar-note-fields";
 
 export type PlanningIdeaTask = {
   id: number;
   title: string;
   note?: string | null;
+  note_field_values?: PillarNoteFieldValues;
   deadline: string | null;
   completed_at: string | null;
   pillar_id: number | null;
@@ -39,6 +41,7 @@ export type PlanningIdeaTask = {
 type Pillar = {
   id: number;
   name: string;
+  note_fields?: PillarNoteFieldDef[];
 };
 
 type Props = {
@@ -84,6 +87,7 @@ function IdeaTile({
   };
 
   const hasNote = !!idea.note?.trim();
+  const hasFieldValues = Object.values(idea.note_field_values ?? {}).some((v) => v?.trim());
 
   return (
     <li
@@ -104,7 +108,7 @@ function IdeaTile({
       >
         {idea.title}
       </button>
-      {hasNote ? <span className="planningIdeaNoteBadge">Note</span> : null}
+      {hasNote || hasFieldValues ? <span className="planningIdeaNoteBadge">Note</span> : null}
       <ActionIconButton
         label={`Delete idea: ${idea.title}`}
         onClick={() => void onDelete(idea)}
@@ -189,7 +193,12 @@ export default function PlanningIdeas({
 
   async function saveIdea(
     id: number,
-    patch: { title: string; note: string | null; deadline: string | null }
+    patch: {
+      title: string;
+      note: string | null;
+      note_field_values: PillarNoteFieldValues;
+      deadline: string | null;
+    }
   ) {
     if (busy) return;
     setBusy(true);
@@ -332,6 +341,7 @@ export default function PlanningIdeas({
       {selectedIdea ? (
         <PlanningIdeaModal
           idea={selectedIdea}
+          noteFields={pillar.note_fields ?? []}
           open
           busy={busy}
           onClose={() => setSelectedIdeaId(null)}

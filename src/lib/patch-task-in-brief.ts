@@ -1,9 +1,13 @@
 import { sortComingUpByDate, type BoardItem } from "./mission-layout";
 import type { MissionTask } from "./mission-prioritize";
+import type { TaskNoteImage } from "./task-note-images";
+import type { PillarNoteFieldValues } from "./pillar-note-fields";
 
 export type TaskBriefPatch = {
   title?: string;
   note?: string | null;
+  note_images?: TaskNoteImage[];
+  note_field_values?: PillarNoteFieldValues;
   pillar_id?: number | null;
   milestone_id?: number | null;
   milestone_title?: string | null;
@@ -38,6 +42,8 @@ export function patchTaskInBrief<T extends BriefSlice>(
     const next = { ...item };
     if (patch.title !== undefined) next.title = patch.title;
     if (patch.note !== undefined) next.note = patch.note;
+    if (patch.note_images !== undefined) next.note_images = patch.note_images;
+    if (patch.note_field_values !== undefined) next.note_field_values = patch.note_field_values;
     if (patch.pillar_id !== undefined) next.pillar_id = patch.pillar_id;
     if (patch.milestone_id !== undefined) next.milestone_id = patch.milestone_id;
     if (patch.milestone_title !== undefined) next.milestone_title = patch.milestone_title;

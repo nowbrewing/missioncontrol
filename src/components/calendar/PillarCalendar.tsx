@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import PlanningIdeas from "./PlanningIdeas";
 import PlanningIdeaModal from "./PlanningIdeaModal";
@@ -43,6 +43,7 @@ type Task = {
   id: number;
   title: string;
   note?: string | null;
+  note_field_values?: PillarNoteFieldValues;
   deadline: string | null;
   completed_at: string | null;
   pillar_id: number | null;
@@ -73,6 +74,9 @@ export default function PillarCalendar() {
 
   const [addingOnDate, setAddingOnDate] = useState<string | null>(null);
   const [addDraft, setAddDraft] = useState("");
+  const [addingTask, setAddingTask] = useState(false);
+  const addingTaskRef = useRef(false);
+  const loadSeqRef = useRef(0);
   const [calendarDropDate, setCalendarDropDate] = useState<string | null>(null);
   const [draggingTaskId, setDraggingTaskId] = useState<number | null>(null);
   const [schedulingIdea, setSchedulingIdea] = useState(false);
@@ -137,15 +141,20 @@ export default function PillarCalendar() {
   );
 
   const load = useCallback(async () => {
+    const seq = ++loadSeqRef.current;
     const [pillarsRes, milestonesRes] = await Promise.all([
       fetch("/api/pillars", { cache: "no-store" }),
       fetch("/api/milestones", { cache: "no-store" }),
     ]);
     await fetch("/api/recurring-events/week", { cache: "no-store" });
     const tasksRes = await fetch("/api/tasks", { cache: "no-store" });
+    if (seq !== loadSeqRef.current) return;
+
     const pillarsData = await pillarsRes.json();
     const tasksData = await tasksRes.json();
     const milestonesData = await milestonesRes.json();
+    if (seq !== loadSeqRef.current) return;
+
     if (pillarsData.ok) {
       setPillars(
         (pillarsData.pillars ?? []).map((p: Pillar) => ({
@@ -287,21 +296,30 @@ export default function PillarCalendar() {
 
   async function addTaskOnDate(date: string) {
     const title = addDraft.trim();
-    if (!title || selectedPillarId == null) return;
+    if (!title || selectedPillarId == null || addingTaskRef.current) return;
 
-    await fetch("/api/tasks", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        title,
-        deadline: date,
-        pillar_id: selectedPillarId,
-      }),
-    });
+    addingTaskRef.current = true;
+    setAddingTask(true);
+    try {
+      const res = await fetch("/api/tasks", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          title,
+          deadline: date,
+          pillar_id: selectedPillarId,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.ok || !data.task) return;
 
-    setAddDraft("");
-    setAddingOnDate(null);
-    await load();
+      upsertTask(data.task);
+      setAddDraft("");
+      setAddingOnDate(null);
+    } finally {
+      addingTaskRef.current = false;
+      setAddingTask(false);
+    }
   }
 
   async function rescheduleTaskOnDate(taskId: number, date: string) {
@@ -342,6 +360,7 @@ export default function PillarCalendar() {
     patch: {
       title: string;
       note: string | null;
+      note_field_values: PillarNoteFieldValues;
       deadline: string | null;
       completed?: boolean;
     }
@@ -351,6 +370,7 @@ export default function PillarCalendar() {
       const body: Record<string, unknown> = {
         title: patch.title,
         note: patch.note,
+        note_field_values: patch.note_field_values,
         deadline: patch.deadline,
       };
       if (patch.completed !== undefined) {
@@ -360,6 +380,7 @@ export default function PillarCalendar() {
       await patchTask(id, body, {
         title: patch.title,
         note: patch.note,
+        note_field_values: patch.note_field_values,
         deadline: patch.deadline,
         is_idea: patch.deadline ? 0 : 1,
         ...(patch.completed !== undefined
@@ -579,15 +600,21 @@ export default function PillarCalendar() {
                           onChange={(e) => setAddDraft(e.target.value)}
                           placeholder="Task title…"
                           autoFocus
+                          disabled={addingTask}
                           aria-label={`New task on ${cell.date}`}
                         />
                         <div className="pillarCalendarAddActions">
-                          <button type="submit" className="chatSendBtn" disabled={!addDraft.trim()}>
-                            Add
+                          <button
+                            type="submit"
+                            className="chatSendBtn"
+                            disabled={addingTask || !addDraft.trim()}
+                          >
+                            {addingTask ? "Adding…" : "Add"}
                           </button>
                           <button
                             type="button"
                             className="outlineButton"
+                            disabled={addingTask}
                             onClick={() => {
                               setAddingOnDate(null);
                               setAddDraft("");
@@ -642,20 +669,10 @@ export default function PillarCalendar() {
                 <PillarNoteFields
                   pillarId={selectedPillar.id}
                   fields={selectedPillar.note_fields ?? []}
-                  values={selectedPillar.note_field_values ?? {}}
-                  onFieldsChange={(fields, values) => {
+                  onFieldsChange={(fields) => {
                     setPillars((prev) =>
                       prev.map((p) =>
-                        p.id === selectedPillar.id
-                          ? { ...p, note_fields: fields, note_field_values: values }
-                          : p
-                      )
-                    );
-                  }}
-                  onValuesChange={(values) => {
-                    setPillars((prev) =>
-                      prev.map((p) =>
-                        p.id === selectedPillar.id ? { ...p, note_field_values: values } : p
+                        p.id === selectedPillar.id ? { ...p, note_fields: fields } : p
                       )
                     );
                   }}
@@ -725,6 +742,7 @@ export default function PillarCalendar() {
         {selectedCalendarTask ? (
           <PlanningIdeaModal
             idea={selectedCalendarTask}
+            noteFields={selectedPillar?.note_fields ?? []}
             open
             busy={taskModalBusy}
             onClose={() => setSelectedCalendarTaskId(null)}

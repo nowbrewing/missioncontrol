@@ -4,6 +4,7 @@ import { nextLegacyId } from "../ids";
 import { toDateOnly, toIso, toSqlDatetime } from "../serialize";
 import { COLLECTIONS, type MongoTask, type TaskStatus } from "../schemas";
 import { findUserById } from "./users";
+import type { TaskNoteImage } from "../../task-note-images";
 
 function taskToRow(t: MongoTask) {
   return {
@@ -12,6 +13,8 @@ function taskToRow(t: MongoTask) {
     title: t.title,
     description: t.description,
     note: t.note ?? null,
+    note_images: t.noteImages ?? [],
+    note_field_values: t.noteFieldValues ?? {},
     deadline: toDateOnly(t.deadline),
     completed_at: toIso(t.completedAt),
     rank: t.rank,
@@ -136,6 +139,8 @@ export async function insertTask(
     title: data.title,
     description: data.description ?? null,
     note: data.note ?? null,
+    noteImages: [],
+    noteFieldValues: {},
     deadline: data.isIdea ? null : data.deadline ? new Date(`${data.deadline}T12:00:00Z`) : null,
     rank: data.rank,
     pillarId: data.pillarId ?? null,
@@ -167,6 +172,8 @@ export async function updateTask(
     title: string;
     description: string | null;
     note: string | null;
+    noteImages: TaskNoteImage[];
+    noteFieldValues: MongoTask["noteFieldValues"];
     deadline: string | null;
     completedAt: string | null;
     rank: number;
@@ -184,6 +191,8 @@ export async function updateTask(
   if (patch.title !== undefined) set.title = patch.title;
   if (patch.description !== undefined) set.description = patch.description;
   if (patch.note !== undefined) set.note = patch.note;
+  if (patch.noteImages !== undefined) set.noteImages = patch.noteImages;
+  if (patch.noteFieldValues !== undefined) set.noteFieldValues = patch.noteFieldValues;
   if (patch.rank !== undefined) set.rank = patch.rank;
   if (patch.pillarId !== undefined) set.pillarId = patch.pillarId;
   if (patch.milestoneId !== undefined) set.milestoneId = patch.milestoneId;
