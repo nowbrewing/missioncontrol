@@ -1,6 +1,8 @@
 import { isDaySpecificScheduled, shouldSurfaceOverdueOnToday, taskBelongsInTodayPriorities } from "./task-schedule";
 import { isInNext7Days } from "./mission-buckets";
 import type { ComingUpItem, MissionMilestone, MissionTask } from "./mission-prioritize";
+import type { TaskNoteImage } from "./task-note-images";
+import type { PillarNoteFieldValues } from "./pillar-note-fields";
 
 export type MissionLayoutRef = {
   kind: "task" | "milestone";
@@ -41,6 +43,8 @@ export type BoardItem = {
   id: number;
   title: string;
   note?: string | null;
+  note_images?: TaskNoteImage[];
+  note_field_values?: PillarNoteFieldValues;
   date: string | null;
   schedule_type?: string | null;
   window_start?: string | null;
@@ -156,6 +160,8 @@ function taskToBoardItem(task: MissionTask): BoardItem {
     id: task.id,
     title: task.title,
     note: task.note,
+    note_images: task.note_images,
+    note_field_values: task.note_field_values,
     date: task.deadline,
     schedule_type: task.schedule_type,
     window_start: task.window_start,

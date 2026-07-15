@@ -3,12 +3,10 @@
 import { useEffect, useState } from "react";
 import ActionIconButton, { DeleteIcon } from "../ActionIconButton";
 import {
-  displayPillarNoteFieldValue,
   newPillarNoteFieldId,
   sanitizePillarNoteFieldDefs,
   type PillarNoteFieldDef,
   type PillarNoteFieldType,
-  type PillarNoteFieldValues,
 } from "../../lib/pillar-note-fields";
 
 type DraftField = {
@@ -91,8 +89,8 @@ function PillarNoteFieldsManagerModal({
           Custom fields
         </h2>
         <p className="modalNote">
-          Add fields that only appear on this pillar&apos;s planning note — dropdowns, text, or
-          numbers (e.g. Theme, Style for TikTok).
+          Define fields for this pillar — each idea and scheduled task can fill in its own values
+          (e.g. Theme, Style for TikTok).
         </p>
 
         <div className="pillarNoteFieldsDraftList">
@@ -118,6 +116,7 @@ function PillarNoteFieldsManagerModal({
                     disabled={saving}
                   >
                     <option value="text">Text</option>
+                    <option value="long_text">Long text</option>
                     <option value="number">Number</option>
                     <option value="select">Dropdown</option>
                   </select>
@@ -172,81 +171,17 @@ function PillarNoteFieldsManagerModal({
   );
 }
 
-function FieldValueInput({
-  field,
-  value,
-  disabled,
-  onChange,
-}: {
-  field: PillarNoteFieldDef;
-  value: string;
-  disabled?: boolean;
-  onChange: (value: string) => void;
-}) {
-  if (field.type === "select") {
-    return (
-      <select
-        className="invInput pillarNoteFieldValueInput"
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        disabled={disabled}
-      >
-        <option value="">Select…</option>
-        {(field.options ?? []).map((option) => (
-          <option key={option} value={option}>
-            {option}
-          </option>
-        ))}
-      </select>
-    );
-  }
-
-  if (field.type === "number") {
-    return (
-      <input
-        type="number"
-        className="invInput pillarNoteFieldValueInput"
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        onBlur={(e) => onChange(e.target.value.trim())}
-        disabled={disabled}
-      />
-    );
-  }
-
-  return (
-    <input
-      type="text"
-      className="invInput pillarNoteFieldValueInput"
-      value={value}
-      onChange={(e) => onChange(e.target.value)}
-      onBlur={(e) => onChange(e.target.value.trim())}
-      disabled={disabled}
-    />
-  );
-}
-
 export default function PillarNoteFields({
   pillarId,
   fields,
-  values,
   onFieldsChange,
-  onValuesChange,
 }: {
   pillarId: number;
   fields: PillarNoteFieldDef[];
-  values: PillarNoteFieldValues;
-  onFieldsChange: (fields: PillarNoteFieldDef[], values: PillarNoteFieldValues) => void;
-  onValuesChange: (values: PillarNoteFieldValues) => void;
+  onFieldsChange: (fields: PillarNoteFieldDef[]) => void;
 }) {
   const [managerOpen, setManagerOpen] = useState(false);
   const [savingDefs, setSavingDefs] = useState(false);
-  const [savingValues, setSavingValues] = useState(false);
-  const [localValues, setLocalValues] = useState<PillarNoteFieldValues>(values);
-
-  useEffect(() => {
-    setLocalValues(values);
-  }, [values, pillarId]);
 
   async function saveFieldDefs(nextFields: PillarNoteFieldDef[]) {
     setSavingDefs(true);
@@ -257,51 +192,20 @@ export default function PillarNoteFields({
         body: JSON.stringify({ note_fields: nextFields }),
       });
       const data = await res.json();
-      if (!data.ok) return false;
+      if (!data.ok) return;
 
       const res2 = await fetch("/api/pillars");
       const pillarsData = await res2.json();
       const pillar = pillarsData.pillars?.find((p: { id: number }) => p.id === pillarId);
       if (pillar) {
-        onFieldsChange(pillar.note_fields ?? [], pillar.note_field_values ?? {});
+        onFieldsChange(pillar.note_fields ?? []);
       } else {
-        onFieldsChange(nextFields, localValues);
+        onFieldsChange(nextFields);
       }
       setManagerOpen(false);
-      return true;
     } finally {
       setSavingDefs(false);
     }
-  }
-
-  async function persistValues(nextValues: PillarNoteFieldValues) {
-    setSavingValues(true);
-    try {
-      const res = await fetch(`/api/pillars/${pillarId}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ note_field_values: nextValues }),
-      });
-      const data = await res.json();
-      if (data.ok) {
-        onValuesChange(nextValues);
-        return true;
-      }
-      return false;
-    } finally {
-      setSavingValues(false);
-    }
-  }
-
-  async function updateValue(fieldId: string, raw: string) {
-    const next = { ...localValues };
-    if (!raw) {
-      delete next[fieldId];
-    } else {
-      next[fieldId] = raw;
-    }
-    setLocalValues(next);
-    await persistValues(next);
   }
 
   return (
@@ -313,39 +217,22 @@ export default function PillarNoteFields({
             type="button"
             className="outlineButton btnCompact pillarNoteFieldsManageBtn"
             onClick={() => setManagerOpen(true)}
-            disabled={savingDefs || savingValues}
+            disabled={savingDefs}
           >
             {fields.length > 0 ? "Manage fields" : "Add fields"}
           </button>
         </div>
 
         {fields.length > 0 ? (
-          <dl className="pillarNoteFieldsList">
-            {fields.map((field) => (
-              <div key={field.id} className="pillarNoteFieldRow">
-                <dt className="pillarNoteFieldLabel">{field.label}</dt>
-                <dd className="pillarNoteFieldValue">
-                  <FieldValueInput
-                    field={field}
-                    value={localValues[field.id] ?? ""}
-                    disabled={savingValues}
-                    onChange={(value) => void updateValue(field.id, value)}
-                  />
-                </dd>
-              </div>
-            ))}
-          </dl>
+          <p className="sectionHint pillarNoteFieldsEmpty">
+            {fields.map((f) => f.label).join(" · ")} — fill in values when you open an idea or
+            task.
+          </p>
         ) : (
           <p className="sectionHint pillarNoteFieldsEmpty">
             No custom fields for this pillar yet.
           </p>
         )}
-
-        {fields.length > 0 && !managerOpen ? (
-          <p className="sectionHint pillarNoteFieldsSavedHint" aria-live="polite">
-            {savingValues ? "Saving…" : "Values save automatically."}
-          </p>
-        ) : null}
       </div>
 
       {managerOpen ? (

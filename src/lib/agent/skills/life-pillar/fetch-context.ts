@@ -39,7 +39,7 @@ export async function fetchPillarSkillContext(
   const pillarTasks = tasks.filter(
     (t) => !t.completed_at && Number(t.pillar_id) === pillarId
   );
-  const pillarRoutines = routines.filter((r) => Number(r.pillar_id) === pillarId);
+  const pillarRoutines = routines.filter((r) => Number(r.pillarId) === pillarId);
 
   const taggedLogs = logEntries.filter((e) =>
     (e.pillar_ids ?? []).includes(pillarId)

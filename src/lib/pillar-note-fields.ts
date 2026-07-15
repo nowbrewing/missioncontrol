@@ -1,4 +1,4 @@
-export type PillarNoteFieldType = "text" | "number" | "select";
+export type PillarNoteFieldType = "text" | "long_text" | "number" | "select";
 
 export type PillarNoteFieldDef = {
   id: string;
@@ -9,9 +9,11 @@ export type PillarNoteFieldDef = {
 
 export type PillarNoteFieldValues = Record<string, string>;
 
-const FIELD_TYPES: PillarNoteFieldType[] = ["text", "number", "select"];
+const FIELD_TYPES: PillarNoteFieldType[] = ["text", "long_text", "number", "select"];
 const MAX_FIELDS = 12;
 const MAX_LABEL_LEN = 40;
+const MAX_TEXT_LEN = 200;
+const MAX_LONG_TEXT_LEN = 2000;
 const MAX_OPTION_LEN = 60;
 const MAX_OPTIONS = 20;
 
@@ -100,7 +102,8 @@ export function parsePillarNoteFieldValues(
       continue;
     }
 
-    out[def.id] = trimmed.slice(0, 200);
+    const maxLen = def.type === "long_text" ? MAX_LONG_TEXT_LEN : MAX_TEXT_LEN;
+    out[def.id] = trimmed.slice(0, maxLen);
   }
 
   return out;

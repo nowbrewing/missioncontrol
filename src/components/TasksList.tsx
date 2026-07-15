@@ -5,18 +5,22 @@ import { PillarHeaderBar } from "./PillarChip";
 import ActionIconButton, { DeleteIcon } from "./ActionIconButton";
 import TaskCardMeta from "./TaskCardMeta";
 import TaskDeadlineEditor from "./TaskDeadlineEditor";
-import TaskNoteEditor from "./TaskNoteEditor";
+import TaskNoteEditor, { type TaskNoteChange } from "./TaskNoteEditor";
 import TaskPillarSelect from "./TaskPillarSelect";
 import TaskTitleEditor from "./TaskTitleEditor";
 import { scheduleTypeFromMode } from "./TaskScheduleSelect";
 import type { TaskScheduleMode } from "./TaskScheduleSelect";
 import { pillarColorVars } from "../lib/pillar-colors";
 import { taskBelongsToPillarGroup } from "../lib/life-admin";
+import type { TaskNoteImage } from "../lib/task-note-images";
+import type { PillarNoteFieldDef, PillarNoteFieldValues } from "../lib/pillar-note-fields";
 type Task = {
   id: number;
   title: string;
   description: string | null;
   note: string | null;
+  note_images?: TaskNoteImage[];
+  note_field_values?: PillarNoteFieldValues;
   deadline: string | null;
   completed_at: string | null;
   rank: number;
@@ -32,6 +36,7 @@ type Pillar = {
   abbreviation: string | null;
   color: string;
   rank: number;
+  note_fields?: PillarNoteFieldDef[];
 };
 
 type Milestone = {
@@ -227,10 +232,18 @@ export default function TasksList({
     }
   }
 
-  async function updateNote(id: number, note: string | null) {
-    applyTaskPatch(id, { note });
+  async function updateNote(id: number, change: TaskNoteChange) {
+    applyTaskPatch(id, {
+      note: change.note,
+      note_images: change.note_images,
+      note_field_values: change.note_field_values,
+    });
     try {
-      await patchTask(id, { note });
+      await patchTask(id, {
+        note: change.note,
+        note_images: change.note_images,
+        note_field_values: change.note_field_values,
+      });
     } catch {
       await load();
       throw new Error("Could not save task note");
@@ -248,6 +261,7 @@ export default function TasksList({
         key={task.id}
         className={`taskRow ${task.completed_at ? "taskRowDone" : ""} ${pillar ? "taskRowColored" : ""}`}
         style={pillar ? pillarColorVars(pillar.color) : undefined}
+        title={pillar?.name}
       >
         <div className="taskCardRowTop">
           <label className="taskCheck">
@@ -283,8 +297,11 @@ export default function TasksList({
           <div className="taskCardActions">
             <TaskNoteEditor
               note={task.note}
+              noteImages={task.note_images ?? []}
+              noteFields={pillar?.note_fields ?? []}
+              noteFieldValues={task.note_field_values ?? {}}
               taskTitle={task.title}
-              onChange={(note) => updateNote(task.id, note)}
+              onChange={(change) => updateNote(task.id, change)}
             />
             <ActionIconButton
               label="Delete task"

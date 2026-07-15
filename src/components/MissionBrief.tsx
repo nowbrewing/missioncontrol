@@ -27,7 +27,7 @@ import ActionIconButton, { DeleteIcon } from "./ActionIconButton";
 import TaskCardMeta from "./TaskCardMeta";
 import TaskDateLockToggle from "./TaskDateLockToggle";
 import TaskDeadlineEditor from "./TaskDeadlineEditor";
-import TaskNoteEditor from "./TaskNoteEditor";
+import TaskNoteEditor, { type TaskNoteChange } from "./TaskNoteEditor";
 import TaskTitleEditor from "./TaskTitleEditor";
 import { formatRelativeDateLabel } from "../lib/mission-dates";
 import { sortComingUpByDate, sortTodayWithCompletedAtBottom, type BoardItem } from "../lib/mission-layout";
@@ -70,7 +70,14 @@ function prioritiesSectionTitle(focusDate: string, calendarToday: string) {
   return `Priorities for ${label}`;
 }
 
-type MissionPillar = { id: number; name: string; color: string };
+import type { PillarNoteFieldDef } from "../lib/pillar-note-fields";
+
+type MissionPillar = {
+  id: number;
+  name: string;
+  color: string;
+  note_fields?: PillarNoteFieldDef[];
+};
 
 function findContainer(
   id: string,
@@ -114,7 +121,7 @@ function SortableBoardRow({
   onMilestoneChange: (id: number, milestoneId: number | null) => void;
   onScheduleChange: (id: number, mode: TaskScheduleMode) => void;
   onTitleChange: (id: number, title: string) => void | Promise<void>;
-  onNoteChange: (id: number, note: string | null) => void | Promise<void>;
+  onNoteChange: (id: number, change: TaskNoteChange) => void | Promise<void>;
   onDeleteTask: (id: number) => void;
   onDateLockChange?: (id: number, locked: boolean, deadline: string | null) => void;
   onDemoteToWeek?: (item: BoardItem) => void;
@@ -143,6 +150,11 @@ function SortableBoardRow({
     item.date < today &&
     !item.completed_at;
 
+  const pillarNoteFields =
+    item.kind === "task" && item.pillar_id != null
+      ? (pillars.find((p) => p.id === item.pillar_id)?.note_fields ?? [])
+      : [];
+
   return (
     <li
       ref={setNodeRef}
@@ -151,6 +163,7 @@ function SortableBoardRow({
         ...(item.pillar_color ? pillarColorVars(item.pillar_color) : {}),
       }}
       className={`comingUpItem boardItem ${isDragging ? "isDragging" : ""} ${item.completed_at ? "taskRowDone" : ""} ${item.pillar_color ? "taskRowColored" : ""}`}
+      title={item.pillar_name ?? undefined}
     >
       <div className="boardItemLead">
         {hideDragHandle ? (
@@ -236,7 +249,7 @@ function SortableBoardRow({
                 {listId === COMING_UP_LIST && onPromoteToToday ? (
                   <button
                     type="button"
-                    className="outlineButton btnCompact boardPromoteBtn"
+                    className="boardSoftBtn"
                     onClick={() => onPromoteToToday(item)}
                     title="Move to Today's priorities"
                   >
@@ -246,7 +259,7 @@ function SortableBoardRow({
                 {listId === TODAY_LIST && onDemoteToWeek ? (
                   <button
                     type="button"
-                    className="outlineButton btnCompact boardDemoteBtn"
+                    className="boardSoftBtn"
                     onClick={() => onDemoteToWeek(item)}
                     title="Move to Next 7 days"
                   >
@@ -256,7 +269,7 @@ function SortableBoardRow({
                 {onDemoteToFuture ? (
                   <button
                     type="button"
-                    className="outlineButton btnCompact boardDemoteBtn"
+                    className="boardSoftBtn"
                     onClick={() => onDemoteToFuture(item)}
                     title="Remove from mission board — shows again by deadline"
                   >
@@ -265,8 +278,11 @@ function SortableBoardRow({
                 ) : null}
                 <TaskNoteEditor
                   note={item.note ?? null}
+                  noteImages={item.note_images ?? []}
+                  noteFields={pillarNoteFields}
+                  noteFieldValues={item.note_field_values ?? {}}
                   taskTitle={item.title}
-                  onChange={(note) => onNoteChange(item.id, note)}
+                  onChange={(change) => onNoteChange(item.id, change)}
                 />
                 <ActionIconButton
                   label={`Delete task: ${item.title}`}
@@ -310,7 +326,7 @@ function SortableBoardRow({
                 <div className="taskCardActions">
                   <button
                     type="button"
-                    className="outlineButton btnCompact boardPromoteBtn"
+                    className="boardSoftBtn"
                     onClick={() => onPromoteToToday(item)}
                     title="Move to Today's priorities"
                   >
@@ -351,7 +367,7 @@ function DoneTodayList({
   onMilestoneChange: (id: number, milestoneId: number | null) => void;
   onScheduleChange: (id: number, mode: TaskScheduleMode) => void;
   onTitleChange: (id: number, title: string) => void | Promise<void>;
-  onNoteChange: (id: number, note: string | null) => void | Promise<void>;
+  onNoteChange: (id: number, change: TaskNoteChange) => void | Promise<void>;
   onDeleteTask: (id: number) => void;
   onDateLockChange?: (id: number, locked: boolean, deadline: string | null) => void;
 }) {
@@ -416,7 +432,7 @@ function BoardList({
   onMilestoneChange: (id: number, milestoneId: number | null) => void;
   onScheduleChange: (id: number, mode: TaskScheduleMode) => void;
   onTitleChange: (id: number, title: string) => void | Promise<void>;
-  onNoteChange: (id: number, note: string | null) => void | Promise<void>;
+  onNoteChange: (id: number, change: TaskNoteChange) => void | Promise<void>;
   onDeleteTask: (id: number) => void;
   onDateLockChange?: (id: number, locked: boolean, deadline: string | null) => void;
   onDemoteToWeek?: (item: BoardItem) => void;
@@ -511,7 +527,7 @@ export default function MissionBrief({
   onMilestoneChange: (id: number, milestoneId: number | null) => void;
   onScheduleChange: (id: number, mode: TaskScheduleMode) => void;
   onTitleChange: (id: number, title: string) => void | Promise<void>;
-  onNoteChange: (id: number, note: string | null) => void | Promise<void>;
+  onNoteChange: (id: number, change: TaskNoteChange) => void | Promise<void>;
   onDeleteTask: (id: number) => void;
   onDateLockChange?: (id: number, locked: boolean, deadline: string | null) => void;
   onLayoutChange: (today: BoardItem[], comingUp: BoardItem[]) => void;

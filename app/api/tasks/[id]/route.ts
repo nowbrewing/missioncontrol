@@ -2,7 +2,15 @@ import { NextResponse } from "next/server";
 import { requireSessionUser } from "../../../../src/lib/auth";
 import { isYyyyMmDd } from "../../../../src/lib/date";
 import { normalizeScheduleType, type ScheduleType } from "../../../../src/lib/task-schedule";
+import {
+  parsePillarNoteFieldDefs,
+  parsePillarNoteFieldValues,
+} from "../../../../src/lib/pillar-note-fields";
+import { parseTaskNoteImages } from "../../../../src/lib/task-note-images";
+import { listPillars } from "../../../../src/lib/mongodb/store/users";
 import { deleteTask, updateTask } from "../../../../src/lib/mongodb/store/tasks";
+import { getMongoDb } from "../../../../src/lib/mongodb/client";
+import { COLLECTIONS, type MongoTask } from "../../../../src/lib/mongodb/schemas";
 
 type Params = { params: Promise<{ id: string }> };
 
@@ -19,6 +27,8 @@ export const PATCH = async (req: Request, { params }: Params) => {
       title?: string;
       description?: string;
       note?: string | null;
+      note_images?: unknown;
+      note_field_values?: unknown;
       deadline?: string | null;
       completed?: boolean;
       pillar_id?: number | null;
@@ -35,6 +45,8 @@ export const PATCH = async (req: Request, { params }: Params) => {
       title: string;
       description: string | null;
       note: string | null;
+      noteImages: ReturnType<typeof parseTaskNoteImages>;
+      noteFieldValues: ReturnType<typeof parsePillarNoteFieldValues>;
       deadline: string | null;
       completedAt: string | null;
       pillarId: number | null;
@@ -56,6 +68,24 @@ export const PATCH = async (req: Request, { params }: Params) => {
     }
     if (body.note !== undefined) {
       patch.note = body.note?.trim() || null;
+    }
+    if (body.note_images !== undefined) {
+      patch.noteImages = parseTaskNoteImages(body.note_images);
+    }
+    if (body.note_field_values !== undefined) {
+      const db = await getMongoDb();
+      const existing = await db.collection<MongoTask>(COLLECTIONS.tasks).findOne({
+        tursoUserId: user.id,
+        tursoId: taskId,
+      });
+      if (!existing) {
+        return NextResponse.json({ ok: false, error: "Task not found" }, { status: 404 });
+      }
+      const pillarId = existing.pillarId;
+      const pillars = await listPillars(user.id);
+      const pillar = pillarId != null ? pillars.find((p) => p.id === pillarId) : undefined;
+      const defs = parsePillarNoteFieldDefs(pillar?.note_fields);
+      patch.noteFieldValues = parsePillarNoteFieldValues(body.note_field_values, defs);
     }
     if (body.deadline !== undefined) {
       patch.deadline = body.deadline;

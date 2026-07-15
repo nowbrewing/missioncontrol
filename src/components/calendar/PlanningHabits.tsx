@@ -15,8 +15,10 @@ import {
   parseDailyDays,
   countSelectedDays,
   tallyBarFillPercent,
+  hasDailyTallyValue,
   type CountProgress,
   type DailyCheckProgress,
+  type DailyDaysMask,
   type DailyTallyProgress,
   type RecurringKind,
   type RecurringProgress,
@@ -173,7 +175,9 @@ function HabitTallyRow({
   const total = dailyTallyTotal(progress);
   const hasTarget = item.target_count > 0;
   const pct = hasTarget ? tallyBarFillPercent(total, item.target_count) : 0;
-  const activeCount = activeDate ? (progress.values[activeDate] ?? 0) : 0;
+  const activeLogged =
+    activeDate != null && hasDailyTallyValue(progress, activeDate);
+  const activeCount = activeLogged && activeDate ? progress.values[activeDate] : null;
 
   function setDayValue(date: string, raw: string) {
     const values = { ...progress.values };
@@ -184,11 +188,7 @@ function HabitTallyRow({
     }
     const n = Number(raw);
     if (!Number.isFinite(n)) return;
-    if (n === 0) {
-      delete values[date];
-    } else {
-      values[date] = n;
-    }
+    values[date] = n;
     onProgressChange({ values });
   }
 
@@ -197,8 +197,8 @@ function HabitTallyRow({
       <div className="recurringDailyRow">
         {item.week_dates.map((date, i) => {
           if (!item.daily_days[i]) return null;
-          const count = progress.values[date] ?? 0;
-          const hasValue = count !== 0;
+          const hasValue = hasDailyTallyValue(progress, date);
+          const count = hasValue ? progress.values[date] : 0;
           return (
             <button
               key={date}
@@ -226,8 +226,8 @@ function HabitTallyRow({
               type="number"
               className="invInput recurringCounterNumberInput"
               step={1}
-              value={activeCount === 0 ? "" : activeCount}
-              placeholder="0"
+              value={activeCount == null ? "" : activeCount}
+              placeholder="e.g. 0"
               onChange={(e) => setDayValue(activeDate, e.target.value)}
               autoFocus
             />
@@ -292,8 +292,8 @@ function DayToggleRow({
   label,
   hint,
 }: {
-  days: boolean[];
-  onChange: (days: boolean[]) => void;
+  days: DailyDaysMask;
+  onChange: (days: DailyDaysMask) => void;
   disabled?: boolean;
   label: string;
   hint?: string;
@@ -309,7 +309,7 @@ function DayToggleRow({
               type="checkbox"
               checked={days[i]}
               onChange={(e) => {
-                const next = [...days];
+                const next = [...days] as DailyDaysMask;
                 next[i] = e.target.checked;
                 onChange(next);
               }}
@@ -331,7 +331,7 @@ function calendarDaysHint(spawnTaskCards: boolean): string | undefined {
 function validateHabitForm(
   kind: RecurringKind,
   targetCount: string,
-  dailyDays: boolean[],
+  dailyDays: DailyDaysMask,
   spawnTaskCards: boolean
 ): string | null {
   if (kind !== "count" || !spawnTaskCards) {
@@ -374,7 +374,7 @@ function HabitFormFields({
   title: string;
   kind: RecurringKind;
   targetCount: string;
-  dailyDays: boolean[];
+  dailyDays: DailyDaysMask;
   spawnTaskCards: boolean;
   tallyEnabled: boolean;
   endDate: string;
@@ -382,7 +382,7 @@ function HabitFormFields({
   onTitleChange: (v: string) => void;
   onKindChange: (v: RecurringKind) => void;
   onTargetCountChange: (v: string) => void;
-  onDailyDaysChange: (days: boolean[]) => void;
+  onDailyDaysChange: (days: DailyDaysMask) => void;
   onSpawnTaskCardsChange: (v: boolean) => void;
   onTallyEnabledChange: (v: boolean) => void;
   onEndDateChange: (v: string) => void;
@@ -546,7 +546,7 @@ export default function PlanningHabits({
   const [newTitle, setNewTitle] = useState("");
   const [newKind, setNewKind] = useState<RecurringKind>("daily");
   const [newTargetCount, setNewTargetCount] = useState("3");
-  const [newDailyDays, setNewDailyDays] = useState([...DEFAULT_DAILY_DAYS]);
+  const [newDailyDays, setNewDailyDays] = useState<DailyDaysMask>([...DEFAULT_DAILY_DAYS]);
   const [newSpawnTaskCards, setNewSpawnTaskCards] = useState(false);
   const [newTallyEnabled, setNewTallyEnabled] = useState(false);
   const [newEndDate, setNewEndDate] = useState("");
@@ -554,7 +554,7 @@ export default function PlanningHabits({
   const [editTitle, setEditTitle] = useState("");
   const [editKind, setEditKind] = useState<RecurringKind>("daily");
   const [editTargetCount, setEditTargetCount] = useState("3");
-  const [editDailyDays, setEditDailyDays] = useState([...DEFAULT_DAILY_DAYS]);
+  const [editDailyDays, setEditDailyDays] = useState<DailyDaysMask>([...DEFAULT_DAILY_DAYS]);
   const [editSpawnTaskCards, setEditSpawnTaskCards] = useState(false);
   const [editTallyEnabled, setEditTallyEnabled] = useState(false);
   const [editEndDate, setEditEndDate] = useState("");
@@ -612,7 +612,7 @@ export default function PlanningHabits({
     title: string,
     kind: RecurringKind,
     targetCount: string,
-    dailyDays: boolean[],
+    dailyDays: DailyDaysMask,
     spawnTaskCards: boolean,
     tallyEnabled: boolean,
     endDate: string
