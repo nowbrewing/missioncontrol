@@ -1,24 +1,35 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import ActionIconButton, { DeleteIcon } from "../ActionIconButton";
+import TaskPillarSelect from "../TaskPillarSelect";
 import TaskPillarNoteFields from "./TaskPillarNoteFields";
 import type { PillarNoteFieldDef, PillarNoteFieldValues } from "../../lib/pillar-note-fields";
 import type { PlanningIdeaTask } from "./PlanningIdeas";
 
+export type PlanningIdeaModalPillar = {
+  id: number;
+  name: string;
+  abbreviation?: string | null;
+  note_fields?: PillarNoteFieldDef[];
+};
+
+export type PlanningIdeaModalPatch = {
+  title: string;
+  note: string | null;
+  note_field_values: PillarNoteFieldValues;
+  deadline: string | null;
+  pillar_id: number | null;
+  completed?: boolean;
+};
+
 type Props = {
   idea: PlanningIdeaTask;
-  noteFields: PillarNoteFieldDef[];
+  pillars: PlanningIdeaModalPillar[];
   open: boolean;
   busy: boolean;
   onClose: () => void;
-  onSave: (patch: {
-    title: string;
-    note: string | null;
-    note_field_values: PillarNoteFieldValues;
-    deadline: string | null;
-    completed?: boolean;
-  }) => Promise<void>;
+  onSave: (patch: PlanningIdeaModalPatch) => Promise<void>;
   onDelete: () => Promise<void>;
 };
 
@@ -28,7 +39,7 @@ function isScheduledTask(idea: PlanningIdeaTask) {
 
 export default function PlanningIdeaModal({
   idea,
-  noteFields,
+  pillars,
   open,
   busy,
   onClose,
@@ -41,6 +52,7 @@ export default function PlanningIdeaModal({
     idea.note_field_values ?? {}
   );
   const [deadline, setDeadline] = useState(idea.deadline ?? "");
+  const [pillarId, setPillarId] = useState<number | null>(idea.pillar_id ?? null);
   const [completed, setCompleted] = useState(!!idea.completed_at);
   const [saveError, setSaveError] = useState<string | null>(null);
 
@@ -50,9 +62,18 @@ export default function PlanningIdeaModal({
     setNote(idea.note ?? "");
     setNoteFieldValues(idea.note_field_values ?? {});
     setDeadline(idea.deadline ?? "");
+    setPillarId(idea.pillar_id ?? null);
     setCompleted(!!idea.completed_at);
     setSaveError(null);
   }, [open, idea]);
+
+  const noteFields = useMemo(
+    () =>
+      pillarId != null
+        ? (pillars.find((p) => p.id === pillarId)?.note_fields ?? [])
+        : [],
+    [pillars, pillarId]
+  );
 
   if (!open) return null;
 
@@ -69,6 +90,7 @@ export default function PlanningIdeaModal({
         note: note.trim() || null,
         note_field_values: noteFieldValues,
         deadline: deadline.trim() || null,
+        pillar_id: pillarId,
         ...(scheduled ? { completed } : {}),
       });
       onClose();
@@ -112,6 +134,17 @@ export default function PlanningIdeaModal({
               onChange={(e) => setTitle(e.target.value)}
               disabled={busy}
               autoFocus
+            />
+          </div>
+
+          <div className="modalField">
+            <label className="modalLabel" htmlFor="planning-idea-pillar">
+              Pillar
+            </label>
+            <TaskPillarSelect
+              pillars={pillars}
+              value={pillarId}
+              onChange={setPillarId}
             />
           </div>
 

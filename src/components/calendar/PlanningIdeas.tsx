@@ -41,11 +41,13 @@ export type PlanningIdeaTask = {
 type Pillar = {
   id: number;
   name: string;
+  abbreviation?: string | null;
   note_fields?: PillarNoteFieldDef[];
 };
 
 type Props = {
   pillar: Pillar;
+  pillars: Pillar[];
   tasks: PlanningIdeaTask[];
   onChanged: () => Promise<void>;
   onTaskUpdated?: (task: PlanningIdeaTask) => void;
@@ -133,6 +135,7 @@ function IdeaTile({
 
 export default function PlanningIdeas({
   pillar,
+  pillars,
   tasks,
   onChanged,
   onTaskUpdated,
@@ -198,6 +201,7 @@ export default function PlanningIdeas({
       note: string | null;
       note_field_values: PillarNoteFieldValues;
       deadline: string | null;
+      pillar_id: number | null;
     }
   ) {
     if (busy) return;
@@ -341,7 +345,7 @@ export default function PlanningIdeas({
       {selectedIdea ? (
         <PlanningIdeaModal
           idea={selectedIdea}
-          noteFields={pillar.note_fields ?? []}
+          pillars={pillars}
           open
           busy={busy}
           onClose={() => setSelectedIdeaId(null)}

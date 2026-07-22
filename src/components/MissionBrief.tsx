@@ -23,11 +23,12 @@ import {
 import { CSS } from "@dnd-kit/utilities";
 import { useCallback, useEffect, useState, type ReactNode } from "react";
 import PillarChip from "./PillarChip";
-import ActionIconButton, { DeleteIcon } from "./ActionIconButton";
+import ActionIconButton, { DeleteIcon, EditIcon } from "./ActionIconButton";
+import PlanningIdeaModal from "./calendar/PlanningIdeaModal";
 import TaskCardMeta from "./TaskCardMeta";
 import TaskDateLockToggle from "./TaskDateLockToggle";
 import TaskDeadlineEditor from "./TaskDeadlineEditor";
-import TaskNoteEditor, { type TaskNoteChange } from "./TaskNoteEditor";
+import { type TaskNoteChange } from "./TaskNoteEditor";
 import TaskTitleEditor from "./TaskTitleEditor";
 import { formatRelativeDateLabel } from "../lib/mission-dates";
 import { sortComingUpByDate, sortTodayWithCompletedAtBottom, type BoardItem } from "../lib/mission-layout";
@@ -36,6 +37,7 @@ import MissionReflection from "./MissionReflection";
 import { pillarColorVars } from "../lib/pillar-colors";
 import type { MissionMilestone } from "../lib/mission-prioritize";
 import type { TaskScheduleMode } from "./TaskScheduleSelect";
+import type { PlanningIdeaTask } from "./calendar/PlanningIdeas";
 
 const TODAY_LIST = "today-priorities";
 const COMING_UP_LIST = "coming-up-next";
@@ -102,12 +104,11 @@ function SortableBoardRow({
   onMilestoneChange,
   onScheduleChange,
   onTitleChange,
-  onNoteChange,
   onDeleteTask,
   onDateLockChange,
   onDemoteToWeek,
-  onDemoteToFuture,
   onPromoteToToday,
+  onOpenEdit,
   hideDragHandle = false,
 }: {
   item: BoardItem;
@@ -121,12 +122,11 @@ function SortableBoardRow({
   onMilestoneChange: (id: number, milestoneId: number | null) => void;
   onScheduleChange: (id: number, mode: TaskScheduleMode) => void;
   onTitleChange: (id: number, title: string) => void | Promise<void>;
-  onNoteChange: (id: number, change: TaskNoteChange) => void | Promise<void>;
   onDeleteTask: (id: number) => void;
   onDateLockChange?: (id: number, locked: boolean, deadline: string | null) => void;
   onDemoteToWeek?: (item: BoardItem) => void;
-  onDemoteToFuture?: (item: BoardItem) => void;
   onPromoteToToday?: (item: BoardItem) => void;
+  onOpenEdit?: (item: BoardItem) => void;
   hideDragHandle?: boolean;
 }) {
   const {
@@ -149,11 +149,6 @@ function SortableBoardRow({
     !!item.date &&
     item.date < today &&
     !item.completed_at;
-
-  const pillarNoteFields =
-    item.kind === "task" && item.pillar_id != null
-      ? (pillars.find((p) => p.id === item.pillar_id)?.note_fields ?? [])
-      : [];
 
   return (
     <li
@@ -201,6 +196,15 @@ function SortableBoardRow({
                 className="boardItemTitle taskCardTitle"
                 onChange={(title) => onTitleChange(item.id, title)}
               />
+              {onOpenEdit ? (
+                <ActionIconButton
+                  className="taskCardEditBtn"
+                  label={`Edit task: ${item.title}`}
+                  onClick={() => onOpenEdit(item)}
+                >
+                  <EditIcon />
+                </ActionIconButton>
+              ) : null}
               <div className="taskDeadlineGroup">
                 <TaskDeadlineEditor
                   deadline={item.date}
@@ -240,6 +244,7 @@ function SortableBoardRow({
                 milestoneId={item.milestone_id ?? null}
                 scheduleType={item.schedule_type}
                 compact
+                editable={false}
                 leading={item.is_new ? <span className="pill pillNew">New</span> : null}
                 onPillarChange={(pillarId) => onPillarChange(item.id, pillarId)}
                 onMilestoneChange={(milestoneId) => onMilestoneChange(item.id, milestoneId)}
@@ -263,27 +268,9 @@ function SortableBoardRow({
                     onClick={() => onDemoteToWeek(item)}
                     title="Move to Next 7 days"
                   >
-                    ↓ 7d
-                  </button>
-                ) : null}
-                {onDemoteToFuture ? (
-                  <button
-                    type="button"
-                    className="boardSoftBtn"
-                    onClick={() => onDemoteToFuture(item)}
-                    title="Remove from mission board — shows again by deadline"
-                  >
                     ↓ Later
                   </button>
                 ) : null}
-                <TaskNoteEditor
-                  note={item.note ?? null}
-                  noteImages={item.note_images ?? []}
-                  noteFields={pillarNoteFields}
-                  noteFieldValues={item.note_field_values ?? {}}
-                  taskTitle={item.title}
-                  onChange={(change) => onNoteChange(item.id, change)}
-                />
                 <ActionIconButton
                   label={`Delete task: ${item.title}`}
                   onClick={() => {
@@ -353,9 +340,9 @@ function DoneTodayList({
   onMilestoneChange,
   onScheduleChange,
   onTitleChange,
-  onNoteChange,
   onDeleteTask,
   onDateLockChange,
+  onOpenEdit,
 }: {
   items: BoardItem[];
   today: string;
@@ -367,9 +354,9 @@ function DoneTodayList({
   onMilestoneChange: (id: number, milestoneId: number | null) => void;
   onScheduleChange: (id: number, mode: TaskScheduleMode) => void;
   onTitleChange: (id: number, title: string) => void | Promise<void>;
-  onNoteChange: (id: number, change: TaskNoteChange) => void | Promise<void>;
   onDeleteTask: (id: number) => void;
   onDateLockChange?: (id: number, locked: boolean, deadline: string | null) => void;
+  onOpenEdit?: (item: BoardItem) => void;
 }) {
   return (
     <SortableContext items={items.map((i) => i.key)} strategy={verticalListSortingStrategy}>
@@ -388,9 +375,9 @@ function DoneTodayList({
             onMilestoneChange={onMilestoneChange}
             onScheduleChange={onScheduleChange}
             onTitleChange={onTitleChange}
-            onNoteChange={onNoteChange}
             onDeleteTask={onDeleteTask}
             onDateLockChange={onDateLockChange}
+            onOpenEdit={onOpenEdit}
             hideDragHandle
           />
         ))}
@@ -411,12 +398,11 @@ function BoardList({
   onMilestoneChange,
   onScheduleChange,
   onTitleChange,
-  onNoteChange,
   onDeleteTask,
   onDateLockChange,
   onDemoteToWeek,
-  onDemoteToFuture,
   onPromoteToToday,
+  onOpenEdit,
   emptyMessage,
   greatJob,
   showCompletedInPlace = false,
@@ -432,12 +418,11 @@ function BoardList({
   onMilestoneChange: (id: number, milestoneId: number | null) => void;
   onScheduleChange: (id: number, mode: TaskScheduleMode) => void;
   onTitleChange: (id: number, title: string) => void | Promise<void>;
-  onNoteChange: (id: number, change: TaskNoteChange) => void | Promise<void>;
   onDeleteTask: (id: number) => void;
   onDateLockChange?: (id: number, locked: boolean, deadline: string | null) => void;
   onDemoteToWeek?: (item: BoardItem) => void;
-  onDemoteToFuture?: (item: BoardItem) => void;
   onPromoteToToday?: (item: BoardItem) => void;
+  onOpenEdit?: (item: BoardItem) => void;
   emptyMessage: string;
   greatJob?: string | null;
   showCompletedInPlace?: boolean;
@@ -475,12 +460,11 @@ function BoardList({
               onMilestoneChange={onMilestoneChange}
               onScheduleChange={onScheduleChange}
               onTitleChange={onTitleChange}
-              onNoteChange={onNoteChange}
               onDeleteTask={onDeleteTask}
               onDateLockChange={onDateLockChange}
               onDemoteToWeek={id === TODAY_LIST ? onDemoteToWeek : undefined}
-              onDemoteToFuture={onDemoteToFuture}
               onPromoteToToday={id === COMING_UP_LIST ? onPromoteToToday : undefined}
+              onOpenEdit={onOpenEdit}
             />
           ))
         )}
@@ -537,6 +521,8 @@ export default function MissionBrief({
   const [doneTodayItems, setDoneTodayItems] = useState(boardDoneToday);
   const [doneTodayExpanded, setDoneTodayExpanded] = useState(false);
   const [activeId, setActiveId] = useState<string | null>(null);
+  const [editingTaskId, setEditingTaskId] = useState<number | null>(null);
+  const [taskModalBusy, setTaskModalBusy] = useState(false);
 
   useEffect(() => {
     setTodayItems(sortTodayWithCompletedAtBottom(boardToday));
@@ -691,16 +677,87 @@ export default function MissionBrief({
     [todayItems, comingUpItems, persistLayout, today]
   );
 
-  const demoteToFuture = useCallback(
-    (item: BoardItem) => {
-      const nextToday = todayItems.filter((i) => i.key !== item.key);
-      const nextComingUp = comingUpItems.filter((i) => i.key !== item.key);
-      setTodayItems(nextToday);
-      setComingUpItems(nextComingUp);
-      persistLayout(nextToday, nextComingUp);
-    },
-    [todayItems, comingUpItems, persistLayout]
-  );
+  const editingTask =
+    editingTaskId == null
+      ? null
+      : todayItems.find((i) => i.kind === "task" && i.id === editingTaskId) ||
+        comingUpItems.find((i) => i.kind === "task" && i.id === editingTaskId) ||
+        doneTodayItems.find((i) => i.kind === "task" && i.id === editingTaskId) ||
+        null;
+
+  const editingIdea: PlanningIdeaTask | null = editingTask
+    ? {
+        id: editingTask.id,
+        title: editingTask.title,
+        note: editingTask.note ?? null,
+        note_field_values: editingTask.note_field_values ?? {},
+        deadline: editingTask.date,
+        completed_at: editingTask.completed_at ?? null,
+        pillar_id: editingTask.pillar_id ?? null,
+        is_idea: 0,
+      }
+    : null;
+
+  const openEdit = useCallback((item: BoardItem) => {
+    if (item.kind !== "task") return;
+    setEditingTaskId(item.id);
+  }, []);
+
+  async function saveEditingTask(patch: {
+    title: string;
+    note: string | null;
+    note_field_values: Record<string, string>;
+    deadline: string | null;
+    pillar_id: number | null;
+    completed?: boolean;
+  }) {
+    if (!editingTask) return;
+    setTaskModalBusy(true);
+    try {
+      if (patch.title !== editingTask.title) {
+        await onTitleChange(editingTask.id, patch.title);
+      }
+      if ((patch.pillar_id ?? null) !== (editingTask.pillar_id ?? null)) {
+        await onPillarChange(editingTask.id, patch.pillar_id);
+      }
+      const noteChanged =
+        (patch.note ?? null) !== (editingTask.note ?? null) ||
+        JSON.stringify(patch.note_field_values ?? {}) !==
+          JSON.stringify(editingTask.note_field_values ?? {});
+      if (noteChanged) {
+        await onNoteChange(editingTask.id, {
+          note: patch.note,
+          note_images: editingTask.note_images ?? [],
+          note_field_values: patch.note_field_values,
+        });
+      }
+      if ((patch.deadline ?? null) !== (editingTask.date ?? null)) {
+        await onDeadlineChange(editingTask.id, patch.deadline);
+      }
+      if (patch.completed !== undefined) {
+        const wasCompleted = !!editingTask.completed_at;
+        if (patch.completed !== wasCompleted) {
+          await onToggleTask(editingTask.id, patch.completed);
+        }
+      }
+    } finally {
+      setTaskModalBusy(false);
+    }
+  }
+
+  async function deleteEditingTask() {
+    if (!editingTask) return;
+    if (!window.confirm(`Delete "${editingTask.title}"? This cannot be undone.`)) {
+      return;
+    }
+    setTaskModalBusy(true);
+    try {
+      await onDeleteTask(editingTask.id);
+      setEditingTaskId(null);
+    } finally {
+      setTaskModalBusy(false);
+    }
+  }
 
   return (
     <div className="missionBrief">
@@ -723,7 +780,7 @@ export default function MissionBrief({
               {headerAction}
             </div>
             <p className="sectionHint">
-              Drag ⠿ to reorder, use ↓ 7d / ↓ Later to demote, or drag items to Next 7 days.
+              Drag ⠿ to reorder, use ↓ Later to move to Next 7 days, or drag items there.
             </p>
             <BoardList
               id={TODAY_LIST}
@@ -737,11 +794,10 @@ export default function MissionBrief({
               onMilestoneChange={onMilestoneChange}
               onScheduleChange={onScheduleChange}
               onTitleChange={onTitleChange}
-              onNoteChange={onNoteChange}
               onDeleteTask={onDeleteTask}
               onDateLockChange={onDateLockChange}
               onDemoteToWeek={demoteToWeek}
-              onDemoteToFuture={demoteToFuture}
+              onOpenEdit={openEdit}
               greatJob={greatJobMessage(todayItems, "today", today, calendarDay)}
               emptyMessage="Drag tasks here or use Check In above."
               showCompletedInPlace
@@ -769,9 +825,9 @@ export default function MissionBrief({
                     onMilestoneChange={onMilestoneChange}
                     onScheduleChange={onScheduleChange}
                     onTitleChange={onTitleChange}
-                    onNoteChange={onNoteChange}
                     onDeleteTask={onDeleteTask}
                     onDateLockChange={onDateLockChange}
+                    onOpenEdit={openEdit}
                   />
                 ) : null}
               </div>
@@ -797,11 +853,10 @@ export default function MissionBrief({
               onMilestoneChange={onMilestoneChange}
               onScheduleChange={onScheduleChange}
               onTitleChange={onTitleChange}
-              onNoteChange={onNoteChange}
               onDeleteTask={onDeleteTask}
               onDateLockChange={onDateLockChange}
-              onDemoteToFuture={demoteToFuture}
               onPromoteToToday={promoteToToday}
+              onOpenEdit={openEdit}
               greatJob={greatJobMessage(comingUpItems, "week", today, calendarDay)}
               emptyMessage="Nothing scheduled in the next 7 days yet."
             />
@@ -820,6 +875,18 @@ export default function MissionBrief({
           ) : null}
         </DragOverlay>
       </DndContext>
+
+      {editingIdea ? (
+        <PlanningIdeaModal
+          idea={editingIdea}
+          pillars={pillars}
+          open
+          busy={taskModalBusy}
+          onClose={() => setEditingTaskId(null)}
+          onSave={saveEditingTask}
+          onDelete={deleteEditingTask}
+        />
+      ) : null}
     </div>
   );
 }

@@ -362,6 +362,7 @@ export default function PillarCalendar() {
       note: string | null;
       note_field_values: PillarNoteFieldValues;
       deadline: string | null;
+      pillar_id: number | null;
       completed?: boolean;
     }
   ) {
@@ -372,6 +373,7 @@ export default function PillarCalendar() {
         note: patch.note,
         note_field_values: patch.note_field_values,
         deadline: patch.deadline,
+        pillar_id: patch.pillar_id,
       };
       if (patch.completed !== undefined) {
         body.completed = patch.completed;
@@ -382,6 +384,7 @@ export default function PillarCalendar() {
         note: patch.note,
         note_field_values: patch.note_field_values,
         deadline: patch.deadline,
+        pillar_id: patch.pillar_id,
         is_idea: patch.deadline ? 0 : 1,
         ...(patch.completed !== undefined
           ? { completed_at: patch.completed ? new Date().toISOString() : null }
@@ -633,6 +636,7 @@ export default function PillarCalendar() {
 
             <PlanningIdeas
               pillar={selectedPillar}
+              pillars={pillars}
               tasks={tasks}
               onChanged={load}
               onTaskUpdated={upsertTask}
@@ -742,7 +746,7 @@ export default function PillarCalendar() {
         {selectedCalendarTask ? (
           <PlanningIdeaModal
             idea={selectedCalendarTask}
-            noteFields={selectedPillar?.note_fields ?? []}
+            pillars={pillars}
             open
             busy={taskModalBusy}
             onClose={() => setSelectedCalendarTaskId(null)}
