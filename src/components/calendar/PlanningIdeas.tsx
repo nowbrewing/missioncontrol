@@ -24,12 +24,14 @@ import { isIdeaTask } from "../../lib/task-ideas";
 import { taskBelongsToPillarGroup } from "../../lib/life-admin";
 import { PLANNING_IDEA_DRAG_MIME } from "../../lib/planning-idea-dnd";
 import PlanningIdeaModal from "./PlanningIdeaModal";
+import type { TaskNoteImage } from "../../lib/task-note-images";
 import type { PillarNoteFieldDef, PillarNoteFieldValues } from "../../lib/pillar-note-fields";
 
 export type PlanningIdeaTask = {
   id: number;
   title: string;
   note?: string | null;
+  note_images?: TaskNoteImage[];
   note_field_values?: PillarNoteFieldValues;
   deadline: string | null;
   completed_at: string | null;
@@ -41,11 +43,13 @@ export type PlanningIdeaTask = {
 type Pillar = {
   id: number;
   name: string;
+  abbreviation?: string | null;
   note_fields?: PillarNoteFieldDef[];
 };
 
 type Props = {
   pillar: Pillar;
+  pillars: Pillar[];
   tasks: PlanningIdeaTask[];
   onChanged: () => Promise<void>;
   onTaskUpdated?: (task: PlanningIdeaTask) => void;
@@ -133,6 +137,7 @@ function IdeaTile({
 
 export default function PlanningIdeas({
   pillar,
+  pillars,
   tasks,
   onChanged,
   onTaskUpdated,
@@ -196,8 +201,10 @@ export default function PlanningIdeas({
     patch: {
       title: string;
       note: string | null;
+      note_images: TaskNoteImage[];
       note_field_values: PillarNoteFieldValues;
       deadline: string | null;
+      pillar_id: number | null;
     }
   ) {
     if (busy) return;
@@ -341,7 +348,7 @@ export default function PlanningIdeas({
       {selectedIdea ? (
         <PlanningIdeaModal
           idea={selectedIdea}
-          noteFields={pillar.note_fields ?? []}
+          pillars={pillars}
           open
           busy={busy}
           onClose={() => setSelectedIdeaId(null)}

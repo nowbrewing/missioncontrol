@@ -44,6 +44,8 @@ a {
 .topbar-home {
   font-weight: 800;
   letter-spacing: -0.01em;
+  white-space: nowrap;
+  flex-shrink: 0;
 }
 
 .title {
@@ -748,25 +750,31 @@ a.outlineButton {
   align-items: center;
   justify-content: space-between;
   gap: 16px;
+  min-width: 0;
 }
 
 .topbarActions {
+  position: relative;
   display: flex;
   align-items: center;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
   gap: 12px;
+  min-width: 0;
+  flex-shrink: 0;
 }
 
 .topbarNav {
   display: flex;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
   gap: 12px;
   font-size: 14px;
   font-weight: 600;
+  min-width: 0;
 }
 
 .topbarNavLink {
   opacity: 0.72;
+  white-space: nowrap;
 }
 
 .topbarNavLink:hover {
@@ -777,6 +785,276 @@ a.outlineButton {
   opacity: 1;
   text-decoration: underline;
   text-underline-offset: 4px;
+}
+
+.topbarPlanning {
+  position: relative;
+}
+
+.topbarPlanningTrigger {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  border: none;
+  background: none;
+  padding: 0;
+  margin: 0;
+  font: inherit;
+  font-size: inherit;
+  font-weight: inherit;
+  color: inherit;
+  cursor: pointer;
+  text-decoration: inherit;
+  text-underline-offset: 4px;
+}
+
+.topbarPlanningChevron {
+  display: inline-block;
+  font-size: 11px;
+  line-height: 1;
+  opacity: 0.7;
+  transform: translateY(1px);
+  transition: transform 0.15s ease;
+}
+
+.topbarPlanningChevronOpen {
+  transform: translateY(1px) rotate(180deg);
+}
+
+.topbarPlanningMenu {
+  position: absolute;
+  top: calc(100% + 10px);
+  left: 0;
+  z-index: 40;
+  list-style: none;
+  margin: 0;
+  padding: 6px;
+  min-width: 180px;
+  max-width: min(280px, calc(100vw - 32px));
+  border: 1px solid #000000;
+  border-radius: 12px;
+  background: #ffffff;
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.12);
+}
+
+.topbarPlanningOption {
+  display: block;
+  padding: 8px 10px;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 600;
+  color: inherit;
+  text-decoration: none;
+  opacity: 0.78;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.topbarPlanningOption:hover,
+.topbarPlanningOption:focus-visible {
+  background: rgba(0, 0, 0, 0.05);
+  opacity: 1;
+}
+
+.topbarPlanningOptionActive {
+  opacity: 1;
+  background: rgba(0, 0, 0, 0.06);
+}
+
+.topbarSettings {
+  position: relative;
+  flex-shrink: 0;
+}
+
+.topbarSettingsBtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  opacity: 0.72;
+}
+
+.topbarSettingsBtn:hover,
+.topbarSettingsBtn:focus-visible,
+.topbarSettingsBtnActive {
+  opacity: 1;
+  background: rgba(0, 0, 0, 0.05);
+}
+
+.topbarSettingsMenu {
+  position: absolute;
+  top: calc(100% + 10px);
+  right: 0;
+  z-index: 40;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 160px;
+  padding: 6px;
+  border: 1px solid #000000;
+  border-radius: 12px;
+  background: #ffffff;
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.12);
+}
+
+.topbarSettingsOption {
+  display: block;
+  width: 100%;
+  padding: 8px 10px;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  font: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  color: inherit;
+  text-align: left;
+  text-decoration: none;
+  cursor: pointer;
+  opacity: 0.78;
+}
+
+.topbarSettingsOption:hover,
+.topbarSettingsOption:focus-visible,
+.topbarSettingsOptionActive {
+  background: rgba(0, 0, 0, 0.05);
+  opacity: 1;
+}
+
+.topbarSettingsSignOut {
+  margin-top: 2px;
+  border-top: 1px solid rgba(0, 0, 0, 0.1);
+  border-radius: 0 0 8px 8px;
+  padding-top: 10px;
+}
+
+.topbarMenuBtn {
+  display: none;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  border: 1px solid #000000;
+  border-radius: 8px;
+  background: #ffffff;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.topbarMenuIcon {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 4px;
+  width: 16px;
+}
+
+.topbarMenuIcon span {
+  display: block;
+  height: 1.5px;
+  width: 100%;
+  background: #000000;
+  border-radius: 1px;
+}
+
+.topbarMenuPanel {
+  display: none;
+}
+
+@media (max-width: 720px) {
+  .topbar-inner {
+    padding: 10px 12px;
+  }
+
+  .topbarRow {
+    gap: 10px;
+  }
+
+  .topbar-home {
+    font-size: 14px;
+  }
+
+  .topbarNavDesktop {
+    display: none;
+  }
+
+  .topbarMenuBtn {
+    display: inline-flex;
+  }
+
+  .topbarMenuPanel {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    position: absolute;
+    top: calc(100% + 8px);
+    right: 0;
+    z-index: 30;
+    min-width: 180px;
+    padding: 8px;
+    border: 1px solid #000000;
+    border-radius: 12px;
+    background: #ffffff;
+    box-shadow: 0 10px 28px rgba(0, 0, 0, 0.12);
+  }
+
+  .topbarMenuNav {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+
+  .topbarMenuPlanning {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    padding-top: 2px;
+  }
+
+  .topbarMenuPlanningLabel {
+    margin: 0;
+    padding: 8px 12px 2px;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    opacity: 0.5;
+  }
+
+  .topbarMenuPlanningLink {
+    padding-left: 20px;
+  }
+
+  .topbarMenuLink {
+    display: block;
+    padding: 10px 12px;
+    border-radius: 8px;
+    font-size: 14px;
+    font-weight: 600;
+    color: inherit;
+    text-decoration: none;
+    opacity: 0.78;
+  }
+
+  .topbarMenuLink:hover,
+  .topbarMenuLink:focus-visible {
+    background: rgba(0, 0, 0, 0.05);
+    opacity: 1;
+  }
+
+  .topbarMenuLinkActive {
+    opacity: 1;
+    background: rgba(0, 0, 0, 0.06);
+  }
 }
 
 .authForm {
@@ -1322,7 +1600,7 @@ a.outlineButton {
 .taskCardRowTop {
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  justify-content: flex-start;
   gap: 12px;
   min-width: 0;
 }
@@ -1330,7 +1608,7 @@ a.outlineButton {
 .taskCardRowBottom {
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  justify-content: flex-start;
   gap: 8px;
   min-width: 0;
 }
@@ -1346,6 +1624,7 @@ a.outlineButton {
   align-items: center;
   gap: 6px;
   flex-shrink: 0;
+  margin-left: auto;
 }
 
 .boardSoftBtn {
@@ -4666,80 +4945,159 @@ a.outlineButton {
 
 @media (max-width: 720px) {
   .boardItem {
-    gap: 6px 8px;
+    gap: 4px 8px;
+  }
+
+  .comingUpItem.boardItem {
+    padding: 8px 10px;
+  }
+
+  .boardItemBody {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
+    grid-template-areas:
+      "title edit"
+      "date actions";
+    gap: 4px 6px;
+    align-items: center;
+  }
+
+  .boardItemBody:has(.taskCardMeta) {
+    grid-template-areas:
+      "title edit"
+      "meta meta"
+      "date actions";
+  }
+
+  .boardItemBody:has(.taskCardMetaEditing) {
+    grid-template-areas:
+      "title edit"
+      "editors editors";
   }
 
   .boardDragHandle {
-    width: 28px;
-    height: 28px;
-    font-size: 16px;
+    width: 24px;
+    height: 24px;
+    font-size: 14px;
   }
 
-  .boardItem .taskCardRowTop {
-    flex-direction: column;
-    align-items: stretch;
-    gap: 6px;
+  .boardItemTitle {
+    font-size: 14px;
   }
 
-  .boardItem .taskCardRowTop .taskDeadlineGroup {
-    align-self: flex-start;
-    max-width: 100%;
-  }
-
+  .boardItem .taskCardRowTop,
   .boardItem .taskCardRowBottom {
-    flex-direction: column;
-    align-items: stretch;
-    gap: 8px;
+    display: contents;
+  }
+
+  .boardItem .taskCardTitle {
+    grid-area: title;
+    min-width: 0;
+    width: auto;
+  }
+
+  .boardItem .taskCardTitle.taskTitleBtn,
+  .boardItem .taskCardTitle.taskTitleInput {
+    width: 100%;
+  }
+
+  .boardItem .taskCardEditBtn {
+    grid-area: edit;
+    flex-shrink: 0;
+    justify-self: end;
+  }
+
+  .boardItem .taskDeadlineGroup {
+    grid-area: date;
+    flex-shrink: 0;
+  }
+
+  .boardItem .taskCardMeta {
+    grid-area: meta;
+    width: auto;
+    min-width: 0;
+  }
+
+  .boardItem .taskCardMetaEditing {
+    grid-area: editors;
+  }
+
+  .boardItem .taskCardActions {
+    grid-area: actions;
+    width: auto;
+    margin-left: 0;
+    flex-wrap: nowrap;
+    justify-content: flex-end;
+    gap: 4px;
+    min-width: 0;
   }
 
   .taskRow .taskCardRowTop {
-    display: grid;
-    grid-template-columns: auto minmax(0, 1fr);
-    grid-template-rows: auto auto;
-    gap: 6px 8px;
-    align-items: start;
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 4px;
   }
 
   .taskRow .taskCheck {
-    grid-row: 1 / span 2;
-    align-self: start;
-    padding-top: 2px;
+    flex-shrink: 0;
+    padding-top: 0;
   }
 
   .taskRow .taskCardRowTop .taskTitleBtn,
   .taskRow .taskCardRowTop .taskTitleInput {
-    grid-column: 2;
-    grid-row: 1;
+    flex: 1;
+    min-width: 0;
     width: 100%;
   }
 
+  .taskRow .taskCardRowTop .taskDeadlineGroup,
   .taskRow .taskCardRowTop .taskDeadlineInput {
-    grid-column: 2;
-    grid-row: 2;
-    justify-self: start;
+    align-self: flex-start;
+    flex-shrink: 0;
   }
 
   .boardItemBody .taskDeadlineInput,
   .boardItem .taskCardRowTop .taskDeadlineInput,
   .taskRow .taskCardRowTop .taskDeadlineInput {
     min-width: 0;
-    max-width: min(100%, 168px);
+    max-width: 118px;
+    padding: 2px 6px;
+    font-size: 12px;
+  }
+
+  .taskDateLockBtn {
+    width: 24px;
+    height: 24px;
   }
 
   .taskCardRowBottom {
-    flex-direction: column;
-    align-items: stretch;
-    gap: 8px;
+    flex-direction: row;
+    align-items: center;
+    gap: 6px;
   }
 
   .taskCardMeta {
-    width: 100%;
+    flex: 0 1 auto;
+    width: auto;
+    min-width: 0;
+  }
+
+  .taskCardMetaEdit {
+    flex-shrink: 0;
   }
 
   .taskCardActions {
-    width: 100%;
-    flex-wrap: wrap;
-    justify-content: flex-start;
+    width: auto;
+    margin-left: auto;
+    flex-wrap: nowrap;
+    justify-content: flex-end;
+    gap: 4px;
+  }
+
+  .boardSoftBtn {
+    padding: 3px 6px;
+    font-size: 11px;
   }
 
   .pillarCalendarDay {

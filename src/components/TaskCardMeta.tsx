@@ -32,6 +32,7 @@ export default function TaskCardMeta({
   milestoneId,
   scheduleType,
   compact = false,
+  editable = true,
   leading,
   onPillarChange,
   onMilestoneChange,
@@ -43,34 +44,40 @@ export default function TaskCardMeta({
   milestoneId: number | null;
   scheduleType?: string | null;
   compact?: boolean;
+  editable?: boolean;
   leading?: ReactNode;
-  onPillarChange: (pillarId: number | null) => void;
-  onMilestoneChange: (milestoneId: number | null) => void;
-  onScheduleChange: (mode: TaskScheduleMode) => void;
+  onPillarChange?: (pillarId: number | null) => void;
+  onMilestoneChange?: (milestoneId: number | null) => void;
+  onScheduleChange?: (mode: TaskScheduleMode) => void;
 }) {
   const [editing, setEditing] = useState(false);
   const mode = scheduleModeFromType(scheduleType);
 
   const pillar = pillarId ? pillars.find((p) => p.id === pillarId) : null;
   const milestone = milestoneId ? milestones.find((m) => m.id === milestoneId) : null;
+  const hasChips = !!(leading || pillar || milestone);
 
-  if (editing) {
+  if (editable && editing) {
     return (
       <div className={`taskCardMeta taskCardMetaEditing ${compact ? "taskCardMetaCompact" : ""}`}>
         <TaskPillarSelect
           pillars={pillars}
           value={pillarId}
-          onChange={onPillarChange}
+          onChange={(id) => onPillarChange?.(id)}
           compact={compact}
         />
         <TaskMilestoneSelect
           milestones={milestones}
           pillarId={pillarId}
           value={milestoneId}
-          onChange={onMilestoneChange}
+          onChange={(id) => onMilestoneChange?.(id)}
           compact={compact}
         />
-        <TaskScheduleSelect value={mode} onChange={onScheduleChange} compact={compact} />
+        <TaskScheduleSelect
+          value={mode}
+          onChange={(next) => onScheduleChange?.(next)}
+          compact={compact}
+        />
         <button
           type="button"
           className="outlineButton btnCompact"
@@ -82,31 +89,40 @@ export default function TaskCardMeta({
     );
   }
 
+  if (!hasChips && !editable) return null;
+
   return (
-    <div className={`taskCardMeta ${compact ? "taskCardMetaCompact" : ""}`}>
-      {leading}
-      {pillar ? (
-        <PillarChip
-          name={pillar.name}
-          abbreviation={pillar.abbreviation}
-          color={pillar.color}
-          compact
-        />
+    <>
+      {hasChips ? (
+        <div className={`taskCardMeta ${compact ? "taskCardMetaCompact" : ""}`}>
+          {leading}
+          {pillar ? (
+            <PillarChip
+              name={pillar.name}
+              abbreviation={pillar.abbreviation}
+              color={pillar.color}
+              compact
+            />
+          ) : null}
+          {milestone ? (
+            <span className="pill pillSubtle taskMilestonePill" title={milestone.title}>
+              {compact && milestone.title.length > 20
+                ? `${milestone.title.slice(0, 18)}…`
+                : milestone.title}
+            </span>
+          ) : null}
+        </div>
       ) : null}
-      {milestone ? (
-        <span className="pill pillSubtle taskMilestonePill" title={milestone.title}>
-          {compact && milestone.title.length > 20
-            ? `${milestone.title.slice(0, 18)}…`
-            : milestone.title}
-        </span>
+      {editable ? (
+        <ActionIconButton
+          className="taskCardMetaEdit"
+          label="Edit pillar, milestone, and schedule"
+          onClick={() => setEditing(true)}
+        >
+          <EditIcon />
+        </ActionIconButton>
       ) : null}
-      <ActionIconButton
-        label="Edit pillar, milestone, and schedule"
-        onClick={() => setEditing(true)}
-      >
-        <EditIcon />
-      </ActionIconButton>
-    </div>
+    </>
   );
 }
 

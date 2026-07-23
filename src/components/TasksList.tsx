@@ -2,18 +2,18 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { PillarHeaderBar } from "./PillarChip";
-import ActionIconButton, { DeleteIcon } from "./ActionIconButton";
+import ActionIconButton, { DeleteIcon, EditIcon } from "./ActionIconButton";
+import PlanningIdeaModal from "./calendar/PlanningIdeaModal";
+import type { PlanningIdeaTask } from "./calendar/PlanningIdeas";
 import TaskCardMeta from "./TaskCardMeta";
 import TaskDeadlineEditor from "./TaskDeadlineEditor";
-import TaskNoteEditor, { type TaskNoteChange } from "./TaskNoteEditor";
 import TaskPillarSelect from "./TaskPillarSelect";
 import TaskTitleEditor from "./TaskTitleEditor";
-import { scheduleTypeFromMode } from "./TaskScheduleSelect";
-import type { TaskScheduleMode } from "./TaskScheduleSelect";
 import { pillarColorVars } from "../lib/pillar-colors";
 import { taskBelongsToPillarGroup } from "../lib/life-admin";
 import type { TaskNoteImage } from "../lib/task-note-images";
 import type { PillarNoteFieldDef, PillarNoteFieldValues } from "../lib/pillar-note-fields";
+
 type Task = {
   id: number;
   title: string;
@@ -63,6 +63,8 @@ export default function TasksList({
     Record<number, { title: string; deadline: string }>
   >({});
   const [loading, setLoading] = useState(true);
+  const [editingTaskId, setEditingTaskId] = useState<number | null>(null);
+  const [taskModalBusy, setTaskModalBusy] = useState(false);
 
   const pillarMap = useMemo(
     () => new Map(pillars.map((p) => [p.id, p])),
@@ -162,6 +164,7 @@ export default function TasksList({
     if (!res.ok || !data.ok) {
       throw new Error(data.error || "Could not save task");
     }
+    return data.task as Task | undefined;
   }
 
   function applyTaskPatch(id: number, patch: Partial<Task>) {
@@ -205,34 +208,14 @@ export default function TasksList({
     }
   }
 
-  async function updateMilestone(id: number, milestoneId: number | null) {
-    const milestone = milestoneId
-      ? milestones.find((m) => m.id === milestoneId)
-      : null;
-    applyTaskPatch(id, {
-      milestone_id: milestoneId,
-      ...(milestone?.pillar_id ? { pillar_id: milestone.pillar_id } : {}),
-    });
-    try {
-      const body: Record<string, unknown> = { milestone_id: milestoneId };
-      if (milestone?.pillar_id) body.pillar_id = milestone.pillar_id;
-      await patchTask(id, body);
-    } catch {
-      await load();
+  async function updateNote(
+    id: number,
+    change: {
+      note: string | null;
+      note_images: TaskNoteImage[];
+      note_field_values: PillarNoteFieldValues;
     }
-  }
-
-  async function updateSchedule(id: number, mode: TaskScheduleMode) {
-    const schedule_type = scheduleTypeFromMode(mode);
-    applyTaskPatch(id, { schedule_type, window_start: null });
-    try {
-      await patchTask(id, { schedule_type, window_start: null });
-    } catch {
-      await load();
-    }
-  }
-
-  async function updateNote(id: number, change: TaskNoteChange) {
+  ) {
     applyTaskPatch(id, {
       note: change.note,
       note_images: change.note_images,
@@ -247,6 +230,82 @@ export default function TasksList({
     } catch {
       await load();
       throw new Error("Could not save task note");
+    }
+  }
+
+  const editingTask =
+    editingTaskId == null ? null : (tasks.find((t) => t.id === editingTaskId) ?? null);
+
+  const editingIdea: PlanningIdeaTask | null = editingTask
+    ? {
+        id: editingTask.id,
+        title: editingTask.title,
+        note: editingTask.note ?? null,
+        note_images: editingTask.note_images ?? [],
+        note_field_values: editingTask.note_field_values ?? {},
+        deadline: editingTask.deadline,
+        completed_at: editingTask.completed_at,
+        pillar_id: editingTask.pillar_id,
+        is_idea: 0,
+      }
+    : null;
+
+  async function saveEditingTask(patch: {
+    title: string;
+    note: string | null;
+    note_images: TaskNoteImage[];
+    note_field_values: PillarNoteFieldValues;
+    deadline: string | null;
+    pillar_id: number | null;
+    completed?: boolean;
+  }) {
+    if (!editingTask) return;
+    setTaskModalBusy(true);
+    try {
+      if (patch.title !== editingTask.title) {
+        await updateTitle(editingTask.id, patch.title);
+      }
+      if ((patch.pillar_id ?? null) !== (editingTask.pillar_id ?? null)) {
+        await updatePillar(editingTask.id, patch.pillar_id);
+      }
+      const noteChanged =
+        (patch.note ?? null) !== (editingTask.note ?? null) ||
+        JSON.stringify(patch.note_images ?? []) !==
+          JSON.stringify(editingTask.note_images ?? []) ||
+        JSON.stringify(patch.note_field_values ?? {}) !==
+          JSON.stringify(editingTask.note_field_values ?? {});
+      if (noteChanged) {
+        await updateNote(editingTask.id, {
+          note: patch.note,
+          note_images: patch.note_images,
+          note_field_values: patch.note_field_values,
+        });
+      }
+      if ((patch.deadline ?? null) !== (editingTask.deadline ?? null)) {
+        await updateDeadline(editingTask.id, patch.deadline);
+      }
+      if (patch.completed !== undefined) {
+        const wasCompleted = !!editingTask.completed_at;
+        if (patch.completed !== wasCompleted) {
+          await toggleTask(editingTask.id, patch.completed);
+        }
+      }
+    } finally {
+      setTaskModalBusy(false);
+    }
+  }
+
+  async function deleteEditingTask() {
+    if (!editingTask) return;
+    if (!window.confirm(`Delete "${editingTask.title}"? This cannot be undone.`)) {
+      return;
+    }
+    setTaskModalBusy(true);
+    try {
+      await deleteTask(editingTask.id);
+      setEditingTaskId(null);
+    } finally {
+      setTaskModalBusy(false);
     }
   }
 
@@ -274,8 +333,16 @@ export default function TasksList({
           <TaskTitleEditor
             title={task.title}
             completed={!!task.completed_at}
+            className="taskCardTitle"
             onChange={(title) => updateTitle(task.id, title)}
           />
+          <ActionIconButton
+            className="taskCardEditBtn"
+            label={`Edit task: ${task.title}`}
+            onClick={() => setEditingTaskId(task.id)}
+          >
+            <EditIcon />
+          </ActionIconButton>
           <TaskDeadlineEditor
             deadline={task.deadline}
             overdue={!!task.deadline && isOverdue(task.deadline, task.completed_at)}
@@ -290,22 +357,16 @@ export default function TasksList({
             milestoneId={task.milestone_id}
             scheduleType={task.schedule_type}
             compact
-            onPillarChange={(pillarId) => updatePillar(task.id, pillarId)}
-            onMilestoneChange={(milestoneId) => updateMilestone(task.id, milestoneId)}
-            onScheduleChange={(mode) => updateSchedule(task.id, mode)}
+            editable={false}
           />
           <div className="taskCardActions">
-            <TaskNoteEditor
-              note={task.note}
-              noteImages={task.note_images ?? []}
-              noteFields={pillar?.note_fields ?? []}
-              noteFieldValues={task.note_field_values ?? {}}
-              taskTitle={task.title}
-              onChange={(change) => updateNote(task.id, change)}
-            />
             <ActionIconButton
               label="Delete task"
-              onClick={() => deleteTask(task.id)}
+              onClick={() => {
+                if (window.confirm(`Delete "${task.title}"? This cannot be undone.`)) {
+                  void deleteTask(task.id);
+                }
+              }}
               variant="danger"
             >
               <DeleteIcon />
@@ -315,6 +376,18 @@ export default function TasksList({
       </li>
     );
   }
+
+  const modal = editingIdea ? (
+    <PlanningIdeaModal
+      idea={editingIdea}
+      pillars={pillars}
+      open
+      busy={taskModalBusy}
+      onClose={() => setEditingTaskId(null)}
+      onSave={saveEditingTask}
+      onDelete={deleteEditingTask}
+    />
+  ) : null;
 
   if (groupByPillar && pillars.length > 0) {
     const grouped = pillars.map((pillar, idx) => ({
@@ -403,6 +476,7 @@ export default function TasksList({
             <span style={{ opacity: 0.8 }}>No tasks yet — add one above or in a pillar.</span>
           </div>
         )}
+        {modal}
       </div>
     );
   }
@@ -437,6 +511,7 @@ export default function TasksList({
         )}
         {visible.map(renderTask)}
       </ul>
+      {modal}
     </div>
   );
 }
