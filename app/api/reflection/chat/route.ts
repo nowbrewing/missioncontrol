@@ -16,6 +16,7 @@ export async function POST(req: Request) {
       plan_date?: string;
       week_monday?: string;
       week_end?: string;
+      pillar_id?: number | null;
       history?: LifeAgentMessage[];
     };
 
@@ -34,6 +35,10 @@ export async function POST(req: Request) {
     const weekEnd =
       body.week_end && isYyyyMmDd(body.week_end) ? body.week_end : undefined;
 
+    const pillarIdRaw = body.pillar_id != null ? Number(body.pillar_id) : null;
+    const pillarId =
+      pillarIdRaw != null && Number.isFinite(pillarIdRaw) ? pillarIdRaw : null;
+
     const history = (body.history ?? []).filter(
       (m) =>
         (m.role === "user" || m.role === "assistant") &&
@@ -48,6 +53,7 @@ export async function POST(req: Request) {
       history,
       weekMonday,
       weekEnd,
+      pillarId,
     });
 
     return NextResponse.json({ ok: true, reply });

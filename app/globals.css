@@ -787,8 +787,153 @@ a.outlineButton {
   text-underline-offset: 4px;
 }
 
-.topbarLogout {
+.topbarPlanning {
+  position: relative;
+}
+
+.topbarPlanningTrigger {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  border: none;
+  background: none;
+  padding: 0;
+  margin: 0;
+  font: inherit;
+  font-size: inherit;
+  font-weight: inherit;
+  color: inherit;
+  cursor: pointer;
+  text-decoration: inherit;
+  text-underline-offset: 4px;
+}
+
+.topbarPlanningChevron {
+  display: inline-block;
+  font-size: 11px;
+  line-height: 1;
+  opacity: 0.7;
+  transform: translateY(1px);
+  transition: transform 0.15s ease;
+}
+
+.topbarPlanningChevronOpen {
+  transform: translateY(1px) rotate(180deg);
+}
+
+.topbarPlanningMenu {
+  position: absolute;
+  top: calc(100% + 10px);
+  left: 0;
+  z-index: 40;
+  list-style: none;
+  margin: 0;
+  padding: 6px;
+  min-width: 180px;
+  max-width: min(280px, calc(100vw - 32px));
+  border: 1px solid #000000;
+  border-radius: 12px;
+  background: #ffffff;
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.12);
+}
+
+.topbarPlanningOption {
+  display: block;
+  padding: 8px 10px;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 600;
+  color: inherit;
+  text-decoration: none;
+  opacity: 0.78;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.topbarPlanningOption:hover,
+.topbarPlanningOption:focus-visible {
+  background: rgba(0, 0, 0, 0.05);
+  opacity: 1;
+}
+
+.topbarPlanningOptionActive {
+  opacity: 1;
+  background: rgba(0, 0, 0, 0.06);
+}
+
+.topbarSettings {
+  position: relative;
   flex-shrink: 0;
+}
+
+.topbarSettingsBtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  opacity: 0.72;
+}
+
+.topbarSettingsBtn:hover,
+.topbarSettingsBtn:focus-visible,
+.topbarSettingsBtnActive {
+  opacity: 1;
+  background: rgba(0, 0, 0, 0.05);
+}
+
+.topbarSettingsMenu {
+  position: absolute;
+  top: calc(100% + 10px);
+  right: 0;
+  z-index: 40;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 160px;
+  padding: 6px;
+  border: 1px solid #000000;
+  border-radius: 12px;
+  background: #ffffff;
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.12);
+}
+
+.topbarSettingsOption {
+  display: block;
+  width: 100%;
+  padding: 8px 10px;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  font: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  color: inherit;
+  text-align: left;
+  text-decoration: none;
+  cursor: pointer;
+  opacity: 0.78;
+}
+
+.topbarSettingsOption:hover,
+.topbarSettingsOption:focus-visible,
+.topbarSettingsOptionActive {
+  background: rgba(0, 0, 0, 0.05);
+  opacity: 1;
+}
+
+.topbarSettingsSignOut {
+  margin-top: 2px;
+  border-top: 1px solid rgba(0, 0, 0, 0.1);
+  border-radius: 0 0 8px 8px;
+  padding-top: 10px;
 }
 
 .topbarMenuBtn {
@@ -838,8 +983,7 @@ a.outlineButton {
     font-size: 14px;
   }
 
-  .topbarNavDesktop,
-  .topbarLogoutDesktop {
+  .topbarNavDesktop {
     display: none;
   }
 
@@ -869,6 +1013,27 @@ a.outlineButton {
     gap: 2px;
   }
 
+  .topbarMenuPlanning {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    padding-top: 2px;
+  }
+
+  .topbarMenuPlanningLabel {
+    margin: 0;
+    padding: 8px 12px 2px;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    opacity: 0.5;
+  }
+
+  .topbarMenuPlanningLink {
+    padding-left: 20px;
+  }
+
   .topbarMenuLink {
     display: block;
     padding: 10px 12px;
@@ -889,26 +1054,6 @@ a.outlineButton {
   .topbarMenuLinkActive {
     opacity: 1;
     background: rgba(0, 0, 0, 0.06);
-  }
-
-  .topbarMenuSignOut {
-    margin-top: 4px;
-    padding: 10px 12px;
-    border: none;
-    border-top: 1px solid rgba(0, 0, 0, 0.1);
-    border-radius: 0 0 8px 8px;
-    background: transparent;
-    font: inherit;
-    font-size: 14px;
-    font-weight: 600;
-    text-align: left;
-    cursor: pointer;
-    color: inherit;
-  }
-
-  .topbarMenuSignOut:hover,
-  .topbarMenuSignOut:focus-visible {
-    background: rgba(0, 0, 0, 0.05);
   }
 }
 

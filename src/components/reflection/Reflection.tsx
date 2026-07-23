@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import ChatMarkdown from "../ChatMarkdown";
 import CorrectionReviewModal from "../correction/CorrectionReviewModal";
 import {
@@ -24,11 +25,27 @@ type ReflectionContext = {
   week_end: string;
   week_label: string;
   kickoff: string;
+  pillar_id: number | null;
+  pillar_name: string | null;
 };
 
 type ReflectionSkill = "reflection" | "correction";
 
+function sessionFingerprint(ctx: ReflectionContext, messages: ReflectionMessage[]) {
+  return JSON.stringify({
+    week: ctx.week_monday,
+    pillar: ctx.pillar_id,
+    messages: messages.map((m) => ({ role: m.role, content: m.content })),
+  });
+}
+
 export default function Reflection() {
+  const searchParams = useSearchParams();
+  const pillarParam = searchParams.get("pillar");
+  const pillarIdRaw = pillarParam ? Number(pillarParam) : null;
+  const pillarId =
+    pillarIdRaw != null && Number.isFinite(pillarIdRaw) ? pillarIdRaw : null;
+
   const [planDate] = useState(() => todayIsoYyyyMmDd());
   const [weekContext, setWeekContext] = useState<ReflectionContext | null>(null);
   const [messages, setMessages] = useState<ReflectionMessage[]>([]);
@@ -52,42 +69,143 @@ export default function Reflection() {
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const formRef = useRef<HTMLFormElement>(null);
 
+  const weekContextRef = useRef(weekContext);
+  const messagesRef = useRef(messages);
+  const skillRef = useRef(skill);
+  const busyRef = useRef(busy);
+  const savedFingerprintRef = useRef<string>("");
+  const autosaveInFlightRef = useRef(false);
+  const skipAutosaveRef = useRef(false);
+
+  weekContextRef.current = weekContext;
+  messagesRef.current = messages;
+  skillRef.current = skill;
+  busyRef.current = busy;
+
+  const markSaved = useCallback((ctx: ReflectionContext, msgs: ReflectionMessage[]) => {
+    savedFingerprintRef.current = sessionFingerprint(ctx, msgs);
+  }, []);
+
+  const autosaveSession = useCallback(async (opts?: { quiet?: boolean }) => {
+    if (autosaveInFlightRef.current || skipAutosaveRef.current) return false;
+    if (skillRef.current === "correction") return false;
+    if (busyRef.current) return false;
+
+    const ctx = weekContextRef.current;
+    const msgs = messagesRef.current;
+    if (!ctx || !msgs.some((m) => m.role === "user")) return false;
+
+    const fingerprint = sessionFingerprint(ctx, msgs);
+    if (fingerprint === savedFingerprintRef.current) return false;
+
+    autosaveInFlightRef.current = true;
+    if (!opts?.quiet) {
+      setSaving(true);
+      setSaveNotice(null);
+      setError(null);
+    }
+
+    try {
+      const res = await fetch("/api/reflection/autosave", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          week_monday: ctx.week_monday,
+          week_end: ctx.week_end,
+          messages: msgs.map((m) => ({ role: m.role, content: m.content })),
+        }),
+        keepalive: true,
+      });
+      const data = await res.json().catch(() => null);
+      if (!res.ok || !data?.ok) {
+        if (!opts?.quiet) {
+          throw new Error(data?.error || "Autosave failed");
+        }
+        return false;
+      }
+      if (data.skipped) return false;
+
+      markSaved(ctx, msgs);
+      if (!opts?.quiet) {
+        setSaveNotice("Reflection auto-saved");
+        window.setTimeout(() => setSaveNotice(null), 5000);
+      }
+      return true;
+    } catch (err) {
+      if (!opts?.quiet) {
+        setError(err instanceof Error ? err.message : "Autosave failed");
+      }
+      return false;
+    } finally {
+      autosaveInFlightRef.current = false;
+      if (!opts?.quiet) setSaving(false);
+    }
+  }, [markSaved]);
+
+  const autosaveSessionRef = useRef(autosaveSession);
+  autosaveSessionRef.current = autosaveSession;
+
   const loadContext = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
-      const res = await fetch(
-        `/api/reflection/context?plan_date=${encodeURIComponent(planDate)}`
-      );
+      const params = new URLSearchParams({ plan_date: planDate });
+      if (pillarId != null) params.set("pillar", String(pillarId));
+      const res = await fetch(`/api/reflection/context?${params.toString()}`);
       const data = await res.json();
       if (!res.ok || !data.ok) {
         throw new Error(data.error || "Could not load week context");
       }
 
-      setWeekContext({
+      const nextCtx: ReflectionContext = {
         week_monday: data.week_monday,
         week_end: data.week_end,
         week_label: data.week_label,
         kickoff: data.kickoff,
-      });
-
-      setMessages([
+        pillar_id: data.pillar_id ?? null,
+        pillar_name: data.pillar_name ?? null,
+      };
+      const kickoffMessages: ReflectionMessage[] = [
         {
           id: "kickoff",
           role: "assistant",
           content: String(data.kickoff),
         },
-      ]);
+      ];
+
+      setWeekContext(nextCtx);
+      setMessages(kickoffMessages);
+      markSaved(nextCtx, kickoffMessages);
+      setSaveOpen(false);
+      setSaveSummary("");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to load");
     } finally {
       setLoading(false);
     }
-  }, [planDate]);
+  }, [planDate, pillarId, markSaved]);
 
   useEffect(() => {
     void loadContext();
+    return () => {
+      void autosaveSessionRef.current({ quiet: true });
+    };
   }, [loadContext]);
+
+  useEffect(() => {
+    const flush = () => {
+      void autosaveSessionRef.current({ quiet: true });
+    };
+    const onVisibility = () => {
+      if (document.visibilityState === "hidden") flush();
+    };
+    window.addEventListener("pagehide", flush);
+    document.addEventListener("visibilitychange", onVisibility);
+    return () => {
+      window.removeEventListener("pagehide", flush);
+      document.removeEventListener("visibilitychange", onVisibility);
+    };
+  }, []);
 
   const handleInputKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key !== "Enter" || e.shiftKey || e.nativeEvent.isComposing) return;
@@ -134,6 +252,7 @@ export default function Reflection() {
       const { modeSwitch, message: parsedMessage, navigate } = parseChatSlashCommand(raw);
       if (navigate) {
         setInput("");
+        void autosaveSession({ quiet: true });
         return;
       }
       message = parsedMessage;
@@ -195,6 +314,7 @@ export default function Reflection() {
           plan_date: planDate,
           week_monday: weekContext.week_monday,
           week_end: weekContext.week_end,
+          pillar_id: weekContext.pillar_id,
           history: messages.map((m) => ({ role: m.role, content: m.content })),
         }),
       });
@@ -249,15 +369,17 @@ export default function Reflection() {
     }
   }
 
-  function clearSession() {
+  async function clearSession() {
     if (busy || summarizing || saving || correctionProposing) return;
     if (messages.length > 1 && !window.confirm("Start over? Your conversation will be cleared.")) {
       return;
     }
+    skipAutosaveRef.current = true;
     exitCorrectionSkill();
-    void loadContext();
     setSaveNotice(null);
     setSaveOpen(false);
+    await loadContext();
+    skipAutosaveRef.current = false;
   }
 
   async function openCorrectionProposeFlow() {
@@ -328,6 +450,7 @@ export default function Reflection() {
         throw new Error(data.error || "Save failed");
       }
 
+      markSaved(weekContext, messages);
       setSaveOpen(false);
       setSaveNotice("Weekly reflection saved to your daily log");
       window.setTimeout(() => setSaveNotice(null), 5000);
@@ -355,7 +478,17 @@ export default function Reflection() {
             </>
           ) : weekContext ? (
             <>
-              Reviewing week of <strong>{weekContext.week_label}</strong> — type{" "}
+              {weekContext.pillar_name ? (
+                <>
+                  Journaling <strong>{weekContext.pillar_name}</strong> · week of{" "}
+                  <strong>{weekContext.week_label}</strong>
+                </>
+              ) : (
+                <>
+                  Reviewing week of <strong>{weekContext.week_label}</strong>
+                </>
+              )}{" "}
+              — auto-saves when you leave. Type{" "}
               <code className="chatModeHintCode">/correction</code> to fix recorded context.
             </>
           ) : (
@@ -381,7 +514,7 @@ export default function Reflection() {
           <button
             type="button"
             className="thinkpadToolbarBtn"
-            onClick={clearSession}
+            onClick={() => void clearSession()}
             disabled={
               loading ||
               busy ||
@@ -402,7 +535,7 @@ export default function Reflection() {
                 loading || busy || summarizing || saving || !hasUserReply
               }
             >
-              {summarizing ? "Summarizing…" : "Save reflection"}
+              {summarizing ? "Summarizing…" : saving ? "Saving…" : "Save now"}
             </button>
           )}
         </div>

@@ -227,7 +227,15 @@ Life admin stays brief (got through some errands / still have items open).
 ${formatWeekReviewBody(recap)}`;
 }
 
-export function formatReflectionKickoff(recap: WeekRecap): string {
+export function formatReflectionKickoff(recap: WeekRecap, pillarName?: string | null): string {
+  if (pillarName) {
+    return `## ${pillarName} — week in review
+
+${formatWeekReviewBody(recap)}
+
+This journal is focused on **${pillarName}**. Ask about context notes, milestones (current or past), what moved this week, or what to prioritize next.`;
+  }
+
   return `${formatWeekReviewBody(recap)}
 
 Let me know what you'd like to delve into — what mattered, what slipped, or anything the list got wrong.`;

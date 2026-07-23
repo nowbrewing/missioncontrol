@@ -46,9 +46,9 @@ export default function TaskCardMeta({
   compact?: boolean;
   editable?: boolean;
   leading?: ReactNode;
-  onPillarChange: (pillarId: number | null) => void;
-  onMilestoneChange: (milestoneId: number | null) => void;
-  onScheduleChange: (mode: TaskScheduleMode) => void;
+  onPillarChange?: (pillarId: number | null) => void;
+  onMilestoneChange?: (milestoneId: number | null) => void;
+  onScheduleChange?: (mode: TaskScheduleMode) => void;
 }) {
   const [editing, setEditing] = useState(false);
   const mode = scheduleModeFromType(scheduleType);
@@ -63,17 +63,21 @@ export default function TaskCardMeta({
         <TaskPillarSelect
           pillars={pillars}
           value={pillarId}
-          onChange={onPillarChange}
+          onChange={(id) => onPillarChange?.(id)}
           compact={compact}
         />
         <TaskMilestoneSelect
           milestones={milestones}
           pillarId={pillarId}
           value={milestoneId}
-          onChange={onMilestoneChange}
+          onChange={(id) => onMilestoneChange?.(id)}
           compact={compact}
         />
-        <TaskScheduleSelect value={mode} onChange={onScheduleChange} compact={compact} />
+        <TaskScheduleSelect
+          value={mode}
+          onChange={(next) => onScheduleChange?.(next)}
+          compact={compact}
+        />
         <button
           type="button"
           className="outlineButton btnCompact"

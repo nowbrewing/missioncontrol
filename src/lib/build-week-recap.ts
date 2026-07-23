@@ -246,3 +246,34 @@ export async function buildWeekRecap(
     },
   };
 }
+
+/** Narrow a full week recap to one pillar (for Journal pillar mode). */
+export function filterWeekRecapToPillar(recap: WeekRecap, pillarId: number): WeekRecap {
+  const pillar = recap.pillars.find((p) => p.id === pillarId);
+  const pillars = pillar ? [pillar] : [];
+  const routines = recap.routines.filter((r) => r.pillar_id === pillarId);
+  const scheduled = pillar?.scheduled ?? [];
+  const completed = pillar?.completed ?? [];
+  const missed = pillar?.missed ?? [];
+
+  return {
+    ...recap,
+    pillars,
+    routines,
+    scheduled,
+    completed,
+    missed,
+    general: {
+      scheduled: [],
+      completed: [],
+      missed: [],
+      logs: emptyPillarLogs(),
+    },
+    daily_logs: {
+      went_well: pillar?.logs.went_well.join("\n") || null,
+      went_poorly: pillar?.logs.went_poorly.join("\n") || null,
+      daily_focus: pillar?.logs.daily_focus.join("\n") || null,
+    },
+  };
+}
+

@@ -10,6 +10,7 @@ import PlanningHabits from "./PlanningHabits";
 import PillarNoteFields from "./PillarNoteFields";
 import ActionIconButton, { EditIcon } from "../ActionIconButton";
 import type { PillarNoteFieldDef, PillarNoteFieldValues } from "../../lib/pillar-note-fields";
+import type { TaskNoteImage } from "../../lib/task-note-images";
 import {
   addMonthsToDate,
   buildMonthGrid,
@@ -43,6 +44,7 @@ type Task = {
   id: number;
   title: string;
   note?: string | null;
+  note_images?: TaskNoteImage[];
   note_field_values?: PillarNoteFieldValues;
   deadline: string | null;
   completed_at: string | null;
@@ -360,6 +362,7 @@ export default function PillarCalendar() {
     patch: {
       title: string;
       note: string | null;
+      note_images: TaskNoteImage[];
       note_field_values: PillarNoteFieldValues;
       deadline: string | null;
       pillar_id: number | null;
@@ -371,6 +374,7 @@ export default function PillarCalendar() {
       const body: Record<string, unknown> = {
         title: patch.title,
         note: patch.note,
+        note_images: patch.note_images,
         note_field_values: patch.note_field_values,
         deadline: patch.deadline,
         pillar_id: patch.pillar_id,
@@ -382,6 +386,7 @@ export default function PillarCalendar() {
       await patchTask(id, body, {
         title: patch.title,
         note: patch.note,
+        note_images: patch.note_images,
         note_field_values: patch.note_field_values,
         deadline: patch.deadline,
         pillar_id: patch.pillar_id,

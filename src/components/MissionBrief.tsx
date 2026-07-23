@@ -36,6 +36,7 @@ import type { MissionReflectionDisplay } from "../lib/mission-reflection-display
 import MissionReflection from "./MissionReflection";
 import { pillarColorVars } from "../lib/pillar-colors";
 import type { MissionMilestone } from "../lib/mission-prioritize";
+import type { TaskNoteImage } from "../lib/task-note-images";
 import type { TaskScheduleMode } from "./TaskScheduleSelect";
 import type { PlanningIdeaTask } from "./calendar/PlanningIdeas";
 
@@ -690,6 +691,7 @@ export default function MissionBrief({
         id: editingTask.id,
         title: editingTask.title,
         note: editingTask.note ?? null,
+        note_images: editingTask.note_images ?? [],
         note_field_values: editingTask.note_field_values ?? {},
         deadline: editingTask.date,
         completed_at: editingTask.completed_at ?? null,
@@ -706,6 +708,7 @@ export default function MissionBrief({
   async function saveEditingTask(patch: {
     title: string;
     note: string | null;
+    note_images: TaskNoteImage[];
     note_field_values: Record<string, string>;
     deadline: string | null;
     pillar_id: number | null;
@@ -722,12 +725,14 @@ export default function MissionBrief({
       }
       const noteChanged =
         (patch.note ?? null) !== (editingTask.note ?? null) ||
+        JSON.stringify(patch.note_images ?? []) !==
+          JSON.stringify(editingTask.note_images ?? []) ||
         JSON.stringify(patch.note_field_values ?? {}) !==
           JSON.stringify(editingTask.note_field_values ?? {});
       if (noteChanged) {
         await onNoteChange(editingTask.id, {
           note: patch.note,
-          note_images: editingTask.note_images ?? [],
+          note_images: patch.note_images,
           note_field_values: patch.note_field_values,
         });
       }

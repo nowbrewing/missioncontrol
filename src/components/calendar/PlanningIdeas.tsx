@@ -24,12 +24,14 @@ import { isIdeaTask } from "../../lib/task-ideas";
 import { taskBelongsToPillarGroup } from "../../lib/life-admin";
 import { PLANNING_IDEA_DRAG_MIME } from "../../lib/planning-idea-dnd";
 import PlanningIdeaModal from "./PlanningIdeaModal";
+import type { TaskNoteImage } from "../../lib/task-note-images";
 import type { PillarNoteFieldDef, PillarNoteFieldValues } from "../../lib/pillar-note-fields";
 
 export type PlanningIdeaTask = {
   id: number;
   title: string;
   note?: string | null;
+  note_images?: TaskNoteImage[];
   note_field_values?: PillarNoteFieldValues;
   deadline: string | null;
   completed_at: string | null;
@@ -199,6 +201,7 @@ export default function PlanningIdeas({
     patch: {
       title: string;
       note: string | null;
+      note_images: TaskNoteImage[];
       note_field_values: PillarNoteFieldValues;
       deadline: string | null;
       pillar_id: number | null;

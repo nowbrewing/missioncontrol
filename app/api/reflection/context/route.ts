@@ -13,6 +13,7 @@ export async function GET(req: Request) {
     const planDateParam = url.searchParams.get("plan_date");
     const weekMondayParam = url.searchParams.get("week_monday");
     const weekEndParam = url.searchParams.get("week_end");
+    const pillarParam = url.searchParams.get("pillar");
 
     const planDate =
       planDateParam && isYyyyMmDd(planDateParam)
@@ -24,11 +25,16 @@ export async function GET(req: Request) {
     const weekEnd =
       weekEndParam && isYyyyMmDd(weekEndParam) ? weekEndParam : undefined;
 
+    const pillarIdRaw = pillarParam ? Number(pillarParam) : null;
+    const pillarId =
+      pillarIdRaw != null && Number.isFinite(pillarIdRaw) ? pillarIdRaw : null;
+
     const ctx = await buildReflectionSystemContext(
       user.id,
       planDate,
       weekMonday,
-      weekEnd
+      weekEnd,
+      pillarId
     );
 
     return NextResponse.json({
@@ -37,6 +43,8 @@ export async function GET(req: Request) {
       week_monday: ctx.range.week_monday,
       week_end: ctx.range.week_end,
       week_label: formatWeekRangeLong(ctx.range.week_monday, ctx.range.week_end),
+      pillar_id: ctx.pillar_id,
+      pillar_name: ctx.pillar_name,
       kickoff: ctx.kickoff,
       recap: {
         scheduled_count: ctx.recap.scheduled.length,
